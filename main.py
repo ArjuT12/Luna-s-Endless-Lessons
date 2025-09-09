@@ -48,6 +48,20 @@ def run_game():
                 pygame.quit()
                 sys.exit()
             
+            # Handle game over screen
+            if level.game_over:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_r:
+                        # Restart game
+                        level = Level()
+                        collision_sprites = level.get_collision_sprites()
+                        background = LayeredBackground()
+                        continue
+                    elif event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit()
+                continue
+            
             # Handle weapon switching with keydown events
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_e:
@@ -81,13 +95,7 @@ def run_game():
         # INVENTORY DISPLAY (UI elements stay in fixed screen position)
         weapon_text = "Weapon: Sword" if not level.player.weapon_switched else "Weapon: Bow and Arrow"
         text_surface = font.render(weapon_text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, 10))
-        
-        
-        # DEBUG: Show player position
-        pos_text = f"Player Y: {level.player.rect.bottom} | Ground: {HEIGHT - GROUND_HEIGHT}"
-        pos_surface = font.render(pos_text, True, (255, 255, 0))
-        screen.blit(pos_surface, (10, 70))
+        screen.blit(text_surface, (10, 90))  # Moved down to make room for stats
 
         pygame.display.flip()
 

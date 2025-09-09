@@ -74,6 +74,13 @@ class Player(pygame.sprite.Sprite):
         self.attacking = False
         self.attack_index = 0
         self.weapon_switched = False
+        
+        # Health system
+        self.max_health = 100
+        self.health = self.max_health
+        self.is_alive = True
+        self.invulnerable = False
+        self.invulnerability_timer = 0
 
     def check_collision(self, dx, dy, collision_sprites):
         """Advanced collision detection that handles edge cases"""
@@ -227,3 +234,44 @@ class Player(pygame.sprite.Sprite):
             self.rect.bottom = ground_level
             self.on_ground = True
             self.vel_y = 0
+        
+        # Update invulnerability timer
+        if self.invulnerable:
+            self.invulnerability_timer -= 1
+            if self.invulnerability_timer <= 0:
+                self.invulnerable = False
+    
+    def take_damage(self, damage):
+        """Take damage and check if player dies"""
+        if self.invulnerable or not self.is_alive:
+            return False
+            
+        self.health -= damage
+        self.invulnerable = True
+        self.invulnerability_timer = 60  # 1 second of invulnerability
+        
+        if self.health <= 0:
+            self.health = 0
+            self.is_alive = False
+            return True  # Player died
+        return False  # Player still alive
+    
+    def draw_health_bar(self, screen):
+        """Draw health bar in top-left corner"""
+        if self.health < self.max_health:
+            # Health bar background
+            bar_width = 200
+            bar_height = 20
+            bar_x = 10
+            bar_y = 10
+            
+            pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
+            
+            # Health bar
+            health_width = (self.health / self.max_health) * bar_width
+            pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, health_width, bar_height))
+            
+            # Health text
+            font = pygame.font.Font(None, 24)
+            health_text = font.render(f"Health: {self.health}/{self.max_health}", True, (255, 255, 255))
+            screen.blit(health_text, (bar_x, bar_y + 25))
