@@ -2,6 +2,7 @@ import pygame
 import random
 import math
 from config import *
+from .animation import load_enemy_animations
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, waypoints=None):
@@ -47,6 +48,9 @@ class Enemy(pygame.sprite.Sprite):
         
         # Animation
         self.animation_timer = 0
+        self.animation_manager = load_enemy_animations('slime', scale=1.0)
+        self.current_state = 'idle'
+        self.facing_right = True
         
     def update(self, player, collision_sprites):
         if not self.is_alive:
@@ -88,17 +92,31 @@ class Enemy(pygame.sprite.Sprite):
         
         # Update animation
         self.animation_timer += 1
+        self.update_animation_state()
+        self.animation_manager.update()
         
+    def update_animation_state(self):
+        """Update animation based on current state"""
+        if not self.is_alive:
+            self.animation_manager.set_animation('death', loop=False)
+        elif self.player_in_range:
+            if self.shoot_cooldown <= 0:
+                self.animation_manager.set_animation('attack', loop=False)
+            else:
+                self.animation_manager.set_animation('walk', loop=True)
+        else:
+            self.animation_manager.set_animation('walk', loop=True)
+    
     def face_player(self, player):
         """Make enemy face the player"""
         if player.rect.centerx < self.rect.centerx:
             # Player is to the left
-            self.image = pygame.Surface((self.size, self.size))
-            self.image.fill((255, 0, 0))
+            self.facing_right = False
         else:
             # Player is to the right
-            self.image = pygame.Surface((self.size, self.size))
-            self.image.fill((255, 100, 100))  # Slightly different color when facing right
+            self.facing_right = True
+        
+        self.animation_manager.set_facing(self.facing_right)
     
     def move_toward_player(self, player, collision_sprites):
         """Move toward the player when in range - only horizontally, keep at ground level"""
@@ -226,6 +244,10 @@ class Enemy(pygame.sprite.Sprite):
         
         # Reset waypoint to current position
         self.target_waypoint = (self.rect.centerx, self.rect.bottom)
+        
+        # Reset animation
+        self.animation_manager.set_animation('idle', loop=True)
+        self.facing_right = True
     
     def get_random_color(self):
         """Get a random color for the enemy"""
@@ -261,13 +283,21 @@ class Enemy(pygame.sprite.Sprite):
         pygame.draw.rect(screen, (255, 255, 255), (screen_x - 5, screen_y, bar_width, bar_height), 1)
     
     def draw(self, screen, screen_pos):
-        """Draw enemy"""
-        if self.is_alive:
-            # Draw enemy at screen position
-            screen.blit(self.image, screen_pos)
+        """Draw enemy with animation"""
+        if self.is_alive or not self.is_alive:  # Draw even when dead for death animation
+            # Get current animation frame
+            frame = self.animation_manager.get_current_frame()
+            if frame:
+                # Center the frame on the enemy position
+                frame_rect = frame.get_rect()
+                frame_rect.centerx = screen_pos[0] + self.size // 2
+                frame_rect.bottom = screen_pos[1] + self.size
+                
+                screen.blit(frame, frame_rect)
             
-            # Draw health bar
-            self.draw_health_bar(screen, screen_pos)
+            # Draw health bar if alive
+            if self.is_alive:
+                self.draw_health_bar(screen, screen_pos)
 
 
 class Projectile(pygame.sprite.Sprite):
