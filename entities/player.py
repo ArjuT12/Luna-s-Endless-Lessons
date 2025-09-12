@@ -1,5 +1,7 @@
 import pygame
 from entities.bow import Bow
+from entities.inventory import Inventory
+from story_progression import StoryProgression
 from config import *
 
 # player.py
@@ -9,8 +11,11 @@ from config import *
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, story_progression=None):
         super().__init__()
+        
+        # Story progression system
+        self.story_progression = story_progression or StoryProgression()
 
         # Load and scale sprite sheets (unchanged from previous)
         walk_sheet = pygame.image.load("Soldier-Walk.png").convert_alpha()
@@ -75,9 +80,14 @@ class Player(pygame.sprite.Sprite):
         self.attack_index = 0
         self.weapon_switched = False
         
-        # Weapon system
+        # Weapon system - start with only sword, unlock bow through story progression
         self.current_weapon = 'sword'  # 'sword', 'bow'
         self.weapon_switch_cooldown = 0
+        self.can_use_bow = self.story_progression.can_use_bow()
+        
+        # Ensure player starts with sword if bow is not unlocked
+        if not self.can_use_bow:
+            self.current_weapon = 'sword'
         
         # Health system
         self.max_health = 100
@@ -85,9 +95,26 @@ class Player(pygame.sprite.Sprite):
         self.is_alive = True
         self.invulnerable = False
         self.invulnerability_timer = 0
+        
+        # Inventory system - start empty, unlock hearts through story progression
+        self.inventory = Inventory()
+        self.inventory_toggle_cooldown = 0
+        self.heart_use_cooldown = 0
+        
+        self.can_use_hearts = self.story_progression.can_use_hearts()
+        
+        # Load saved inventory if hearts are unlocked
+        if self.can_use_hearts:
+            saved_inventory = self.story_progression.load_inventory()
+            self.inventory.items = saved_inventory.copy()
+            print(f"Loaded inventory: {saved_inventory}")
+            
+            # Add initial hearts only if inventory is empty (first time unlocking)
+            if len(self.inventory.items) == 0:
+                self.inventory.add_item('heart', 3)  # Start with 3 hearts
 
     def check_collision(self, dx, dy, collision_sprites):
-        """Advanced collision detection that handles edge cases"""
+        """Advanced collision detection that handles edge cases and platform tiles"""
         # Create a test rect for collision detection using the smaller collision box
         test_rect = self.collision_rect.copy()
         test_rect.centerx = self.rect.centerx + dx
@@ -96,7 +123,18 @@ class Player(pygame.sprite.Sprite):
         # Check for collisions
         for sprite in collision_sprites:
             if test_rect.colliderect(sprite.rect):
-                return True, sprite
+                # Check if this is a platform tile
+                if hasattr(sprite, 'is_platform') and sprite.is_platform:
+                    # For platform tiles, only allow collision from above (falling down)
+                    if dy > 0:  # Player is falling down
+                        # Pixel-perfect collision: player's bottom must be at or above platform's top
+                        if self.rect.bottom <= sprite.rect.top:
+                            return True, sprite
+                    # If player is moving up or horizontally, ignore platform collision
+                    continue
+                else:
+                    # Regular solid tile collision
+                    return True, sprite
         return False, None
     
     def check_attack_collision(self, enemy_sprites):
@@ -133,16 +171,28 @@ class Player(pygame.sprite.Sprite):
                     print(f"ATTACK HIT! Enemy tile ID {enemy.tile_id} at position ({enemy.rect.x}, {enemy.rect.y})")
                     # You can add more logic here like removing the enemy, dealing damage, etc.
 
-    def update(self, keys, collision_sprites, enemy_sprites=None):
+    def update(self, keys, collision_sprites, enemy_sprites=None, dialogue_active=False):
         dx = 0
         self.walking = False
 
         # Update weapon switch cooldown
         if self.weapon_switch_cooldown > 0:
             self.weapon_switch_cooldown -= 1
+        
+        # Update inventory and heart use cooldowns
+        if self.inventory_toggle_cooldown > 0:
+            self.inventory_toggle_cooldown -= 1
+        if self.heart_use_cooldown > 0:
+            self.heart_use_cooldown -= 1
+        
+        # Update inventory state
+        self.inventory.update()
 
-        # Only allow movement, direction changes, and jumping if not attacking
-        if not self.attacking:
+        # Only allow movement, direction changes, and jumping if not attacking, not in inventory navigation mode, and not in dialogue
+        if not self.attacking and not self.inventory.is_open and not dialogue_active:
+            # Debug: print when movement is enabled
+            if keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]:
+                print(f"Movement enabled. Inventory open: {self.inventory.is_open}")
             if keys[pygame.K_RIGHT]:
                 dx = 4
                 self.facing_right = True
@@ -156,21 +206,106 @@ class Player(pygame.sprite.Sprite):
                 self.vel_y = -JUMP_STRENGTH
                 self.on_ground = False
 
-            # Weapon switching (E key)
-            if keys[pygame.K_e] and self.weapon_switch_cooldown <= 0:
+            # Weapon switching (E key) - only if bow is unlocked
+            if keys[pygame.K_e] and self.weapon_switch_cooldown <= 0 and self.can_use_bow:
                 if self.current_weapon == 'sword':
                     self.current_weapon = 'bow'
                     self.current_attack_frames_right = self.attack2_frames_right
                     self.current_attack_frames_left = self.attack2_frames_left
+                    print("Switched to BOW weapon")
                 else:
                     self.current_weapon = 'sword'
                     self.current_attack_frames_right = self.attack1_frames_right
                     self.current_attack_frames_left = self.attack1_frames_left
+                    print("Switched to SWORD weapon")
                 self.weapon_switch_cooldown = 30
+            elif keys[pygame.K_e] and not self.can_use_bow:
+                print("Bow not yet unlocked! Die to progress the story...")
 
             if keys[pygame.K_f]:
-                self.attacking = True
-                self.attack_index = 0
+                # Only allow attacking if current weapon is available
+                if self.current_weapon == 'sword' or (self.current_weapon == 'bow' and self.can_use_bow):
+                    self.attacking = True
+                    self.attack_index = 0
+                elif self.current_weapon == 'bow' and not self.can_use_bow:
+                    print("Bow not yet unlocked! Die to progress the story...")
+            
+            # Enter inventory navigation (I key) - only when not in navigation mode and hearts unlocked
+            if keys[pygame.K_i] and self.inventory_toggle_cooldown <= 0 and self.can_use_hearts:
+                if not self.inventory.is_open:
+                    self.inventory.is_open = True
+                    print("Entered inventory navigation mode")
+                    self.inventory_toggle_cooldown = 5  # 5 frames cooldown
+            elif keys[pygame.K_i] and not self.can_use_hearts:
+                print("Inventory not yet unlocked! Die to progress the story...")
+            
+            # Select items with number keys (1-0) - only when not in navigation mode and hearts unlocked
+            if not self.inventory.is_open and self.can_use_hearts:
+                if keys[pygame.K_1] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(0)
+                    print("Highlighted slot 1")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_2] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(1)
+                    print("Highlighted slot 2")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_3] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(2)
+                    print("Highlighted slot 3")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_4] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(3)
+                    print("Highlighted slot 4")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_5] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(4)
+                    print("Highlighted slot 5")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_6] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(5)
+                    print("Highlighted slot 6")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_7] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(6)
+                    print("Highlighted slot 7")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_8] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(7)
+                    print("Highlighted slot 8")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_9] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(8)
+                    print("Highlighted slot 9")
+                    self.inventory_toggle_cooldown = 5
+                elif keys[pygame.K_0] and self.inventory_toggle_cooldown <= 0:
+                    self.inventory.highlight_slot(9)
+                    print("Highlighted slot 0")
+                    self.inventory_toggle_cooldown = 5
+            
+        # Inventory navigation when open (works even when movement is disabled)
+        if self.inventory.is_open:
+            # Exit inventory navigation (U key)
+            if keys[pygame.K_u] and self.inventory_toggle_cooldown <= 0:
+                self.inventory.is_open = False
+                print("Exited inventory navigation mode")
+                self.inventory_toggle_cooldown = 5  # 5 frames cooldown
+            
+            if keys[pygame.K_LEFT] and self.inventory_toggle_cooldown <= 0:
+                self.inventory.select_previous_slot()
+                self.inventory_toggle_cooldown = 5
+            elif keys[pygame.K_RIGHT] and self.inventory_toggle_cooldown <= 0:
+                self.inventory.select_next_slot()
+                self.inventory_toggle_cooldown = 5
+            elif keys[pygame.K_w] and self.heart_use_cooldown <= 0 and self.can_use_hearts:
+                self.use_selected_item()
+                self.heart_use_cooldown = 10
+        
+        # Use highlighted item with W key (works in both modes) - only if hearts unlocked
+        if keys[pygame.K_w] and self.heart_use_cooldown <= 0 and self.can_use_hearts:
+            self.use_highlighted_item()
+            self.heart_use_cooldown = 10
+        elif keys[pygame.K_w] and not self.can_use_hearts:
+            print("Hearts not yet unlocked! Die to progress the story...")
 
         self.vel_y += GRAVITY
         dy = self.vel_y
@@ -269,8 +404,12 @@ class Player(pygame.sprite.Sprite):
             if self.invulnerability_timer <= 0:
                 self.invulnerable = False
     
-    def take_damage(self, damage):
+    def take_damage(self, damage, dialogue_active=False):
         """Take damage and check if player dies"""
+        # Don't take damage during dialogue sequences
+        if dialogue_active:
+            return False
+            
         if self.invulnerable or not self.is_alive:
             return False
             
@@ -281,6 +420,8 @@ class Player(pygame.sprite.Sprite):
         if self.health <= 0:
             self.health = 0
             self.is_alive = False
+            # Update story progression when player dies
+            self.story_progression.player_died()
             return True  # Player died
         return False  # Player still alive
     
@@ -315,3 +456,110 @@ class Player(pygame.sprite.Sprite):
     def can_attack(self):
         """Check if player can attack (not already attacking)"""
         return not self.attacking
+    
+    def use_heart(self):
+        """Use a heart from inventory to heal - only if hearts are unlocked"""
+        if not self.can_use_hearts:
+            print("Hearts not yet unlocked! Die to progress the story...")
+            return
+            
+        if self.inventory.use_item('heart'):
+            # Heal the player
+            heal_amount = 50  # Same as heart heal amount
+            old_health = self.health
+            self.health = min(self.max_health, self.health + heal_amount)
+            actual_heal = self.health - old_health
+            print(f"Used heart! Healed {actual_heal} health. Current health: {self.health}/{self.max_health}")
+            print(f"Hearts remaining in inventory: {self.inventory.get_item_quantity('heart')}")
+            # Save inventory after using heart
+            self.save_inventory()
+        else:
+            print("No hearts available in inventory!")
+    
+    def use_item_from_slot(self, slot_number):
+        """Use item from specific slot (0-9)"""
+        if 0 <= slot_number < len(self.inventory.items):
+            item = self.inventory.items[slot_number]
+            if item['type'] == 'heart':
+                self.use_heart()
+            else:
+                print(f"Cannot use item type: {item['type']}")
+        else:
+            print(f"No item in slot {slot_number + 1}")
+    
+    def use_selected_item(self):
+        """Use the currently selected item"""
+        selected_item = self.inventory.get_selected_item()
+        if selected_item:
+            if selected_item['type'] == 'heart':
+                self.use_heart()
+            else:
+                print(f"Cannot use item type: {selected_item['type']}")
+        else:
+            print("No item selected")
+    
+    def use_highlighted_item(self):
+        """Use the highlighted item (from number key selection)"""
+        if self.inventory.highlighted_slot >= 0 and self.inventory.highlighted_slot < len(self.inventory.items):
+            item = self.inventory.items[self.inventory.highlighted_slot]
+            if item['type'] == 'heart':
+                slot_num = self.inventory.highlighted_slot + 1
+                self.use_heart()
+                # Keep the highlight so player can use the same item again
+                print(f"Used heart from slot {slot_num}")
+            else:
+                print(f"Cannot use item type: {item['type']}")
+        else:
+            print("No item highlighted")
+    
+    def save_inventory(self):
+        """Save current inventory to story progression"""
+        if self.can_use_hearts:
+            self.story_progression.save_inventory(self.inventory.items)
+    
+    def update_story_progression(self):
+        """Update player abilities based on story progression"""
+        self.can_use_hearts = self.story_progression.can_use_hearts()
+        self.can_use_bow = self.story_progression.can_use_bow()
+        
+        # Add hearts if they just got unlocked
+        if self.can_use_hearts and self.inventory.get_item_quantity('heart') == 0:
+            self.inventory.add_item('heart', 3)  # Give 3 hearts when unlocked
+            print("Hearts unlocked! Added 3 hearts to inventory.")
+            # Save inventory after adding initial hearts
+            self.save_inventory()
+    
+    def sync_inventory_from_story_progress(self):
+        """Sync inventory with story progress file (for real-time updates)"""
+        if self.can_use_hearts:
+            # Reload story progression to get latest data
+            self.story_progression.load_progress()
+            
+            # Get current inventory from story progress
+            saved_inventory = self.story_progression.load_inventory()
+            current_hearts = self.inventory.get_item_quantity('heart')
+            saved_hearts = 0
+            
+            # Count hearts in saved inventory
+            for item in saved_inventory:
+                if item.get('type') == 'heart':
+                    saved_hearts = item.get('quantity', 0)
+                    break
+            
+            # Update inventory if there's a difference
+            if saved_hearts != current_hearts:
+                # Clear current heart items and set to exact amount from story progress
+                # Remove all existing heart items
+                self.inventory.items = [item for item in self.inventory.items if item.get('type') != 'heart']
+                
+                # Add the correct number of hearts from story progress
+                if saved_hearts > 0:
+                    self.inventory.add_item('heart', saved_hearts)
+                    print(f"🔄 Synced {saved_hearts} hearts from story progress")
+                
+                # Don't save back to story progress here - let the game handle that
+                # This prevents infinite sync loops
+    
+    def draw_inventory(self, screen):
+        """Draw the inventory UI - always visible"""
+        self.inventory.draw(screen)

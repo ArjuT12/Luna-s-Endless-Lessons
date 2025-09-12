@@ -102,7 +102,6 @@ class MapLoader:
                     image_path = image_path[3:]  # Remove ../ prefix
                 
                 self.tile_images[tileset_key] = pygame.image.load(image_path).convert_alpha()
-                print(f"Loaded tileset image: {image_path}")
             except pygame.error as e:
                 print(f"Failed to load tileset image {tileset['image']}: {e}")
                 return self.create_fallback_tile(tile_id)
@@ -162,12 +161,15 @@ class MapLoader:
         
         # Define which tile IDs are solid/collision tiles
         # Include all solid tiles that should have collision
-        # First tileset (1-60): solid tiles
-        first_tileset_solid = {1, 2, 3, 11, 12, 13, 21, 22, 23, 31}
-        # Sunrise tileset (61+): only specific platform tiles are solid for walking
-        sunrise_tileset_solid = {61, 62, 63, 64}  # Only these tiles are walkable platforms
+        # First tileset (1-55): solid tiles for daytime tileset
+        first_tileset_solid = {1, 2, 3, 5, 11, 13, 15, 21, 22, 23, 31}  # Added 5 and 15 for forest2.json
+        # Night time tileset (1-60): solid tiles for night time tileset
+        night_tileset_solid = {1, 2, 3, 11, 13, 21, 22, 23, 31}  # Removed 12 - it's a platform tile
         # Tiles 72, 73, 74, 83, 84, 85, 86 are decorative support tiles with NO collision
-        solid_tiles = first_tileset_solid | sunrise_tileset_solid
+        solid_tiles = first_tileset_solid | night_tileset_solid
+        
+        # Define which tile IDs are platform tiles (one-way collision)
+        platform_tiles = {12}  # Tile 12 is a platform tile
         
         # Define which tile IDs are enemy tiles
         # First tileset enemies
@@ -196,28 +198,37 @@ class MapLoader:
                         world_x = x * tile_width
                         world_y = y * tile_height
                         
+                        
 
                         
                         # Create tile image
                         tile_image = self.create_tile_image(tile_id)
                         if tile_image:
+                            # Debug: log platform tile creation
+                            if tile_id in platform_tiles:
+                                print(f"Created platform tile {tile_id} at ({world_x}, {world_y}) with image size: {tile_image.get_size()}")
+                            
                             # Create tile sprite
-                            # Only add solid tiles to collision groups
+                            # groups[0] = visible_sprite, groups[1] = collision_sprite, groups[2] = enemy_sprite
                             if tile_id in solid_tiles:
-                                tile = Tile((world_x, world_y), groups)
+                                # Solid tiles: visible + collision
+                                tile = Tile((world_x, world_y), [groups[0], groups[1]])
+                            elif tile_id in platform_tiles:
+                                # Platform tiles: visible + collision + mark as platform
+                                tile = Tile((world_x, world_y), [groups[0], groups[1]])
+                                tile.is_platform = True  # Mark as platform tile
                             elif tile_id in enemy_tiles:
-                                # For enemy tiles, add to enemy group (last group in the list)
-                                enemy_groups = [groups[-1]] if groups else []
-                                tile = Tile((world_x, world_y), enemy_groups)
+                                # Enemy tiles: enemy group only
+                                tile = Tile((world_x, world_y), [groups[2]])
                                 tile.tile_id = tile_id  # Store tile ID for enemy detection
                             elif tile_id in interactive_tiles:
-                                # For interactive tiles, create without collision but store tile ID
-                                tile = Tile((world_x, world_y), [])
+                                # Interactive tiles: visible only
+                                tile = Tile((world_x, world_y), [groups[0]])
                                 tile.tile_id = tile_id  # Store tile ID for interaction detection
                                 tile.is_interactive = True  # Mark as interactive
                             else:
-                                # For decorative tiles, create without collision
-                                tile = Tile((world_x, world_y), [])
+                                # Decorative tiles: visible only
+                                tile = Tile((world_x, world_y), [groups[0]])
                             tile.image = tile_image
                             tiles.append(tile)
         

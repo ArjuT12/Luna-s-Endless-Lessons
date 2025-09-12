@@ -8,6 +8,8 @@ from entities.arrow import Arrow
 from levels.tile import Tile
 from levels.camera import Camera
 from levels.map_loader import MapLoader
+from story_progression import StoryProgression
+from api_client import get_api_client, APIError
 
 
 
@@ -16,6 +18,21 @@ class Level:
         
         #Level setup
         self.display_surface = pygame.display.get_surface()
+        
+        # Story progression system
+        self.story_progression = StoryProgression()
+        
+        # API integration
+        self.api_client = get_api_client()
+        self.api_connected = False
+        self.score_saved = False
+        self.player_data_synced = False
+        self.game_data_initialized = False
+        self.player_progress = None
+        
+        # Currency system
+        self.currency_earned = 0
+        self.currency_rule = None
 
         #sprite Group 
         self.visible_sprite = pygame.sprite.Group()
@@ -58,6 +75,14 @@ class Level:
         self.map_loader = MapLoader()
         self.map_tiles = []
         
+        # Map progression system
+        self.current_map = "forest2"  # Start with forest2 map
+        self.map_transitioning = False
+        self.transition_timer = 0
+        self.transition_duration = 120  # 2 seconds at 60fps
+        self.transition_progress = 0.0
+        self.sunrise_character = None  # Static character for sunrise
+        
         # Interaction system
         self.interactive_tiles = []
         self.nearby_interactive = None
@@ -66,10 +91,17 @@ class Level:
         self.current_dialogue = None
         self.dialogue_index = 0
         
+        # Story dialogue system
+        self.story_dialogue_active = False
+        self.current_story_dialogue = None
+        self.story_dialogue_index = 0
+        self.show_intro_dialogue = False
+        
         # Key state tracking for dialogue
         self.z_pressed = False
         self.enter_pressed = False
         self.q_pressed = False
+        self.r_pressed = False
         
         # Test dialogues
         self.dialogues = {
@@ -87,6 +119,9 @@ class Level:
         
         # Start timing
         self.start_time = pygame.time.get_ticks()
+        
+        # Initialize all game data through API
+        self.initialize_game_data()
     
     def is_position_on_tile_id(self, x, y, tile_id):
         """Check if a position is on a specific tile ID"""
@@ -129,11 +164,25 @@ class Level:
         # Map is 100x20 tiles, bottom 3 rows are floor (96 pixels from bottom)
         # Player feet should start at 97 pixels from bottom, so bottom = 640 - 97 = 543
         # Position player at X: 32, Y: 543
-        self.player = Player()
+        self.player = Player(self.story_progression)
         self.player.rect.centerx = 32  # Starting position X: 32
         self.player.rect.bottom = 543  # Player feet at 97 pixels from bottom (640 - 97 = 543)
         self.player.on_ground = True  # Ensure player starts on ground
         self.player.vel_y = 0  # Ensure player starts with zero velocity
+        
+        # Show intro dialogue if not seen before, or story dialogue if player died
+        if not self.story_progression.progress["has_seen_intro"]:
+            self.show_intro_dialogue = True
+            self.story_progression.progress["has_seen_intro"] = True
+            self.story_progression.save_progress()
+        else:
+            # Check if we should show story dialogue after death
+            current_story_part = self.story_progression.progress["current_story_part"]
+            if current_story_part > 0:
+                # Only start dialogue if there is dialogue to show (skip after 4 deaths)
+                dialogue = self.story_progression.get_story_dialogue(current_story_part)
+                if dialogue:  # Only start if dialogue exists
+                    self.start_story_dialogue(current_story_part)
         
         # Create bow weapon using attack2_sheet (bow and arrow sprites)
         bow_frames = self.player.attack2_frames_right  # Use attack2_sheet for bow
@@ -141,15 +190,45 @@ class Level:
         
         # Create enemies
         self.create_enemies()
+        
+        # Create sunrise character (static blue and orange man)
+        self.create_sunrise_character()
+    
+    def create_sunrise_character(self):
+        """Create a static character for the sunrise map"""
+        # Create a simple static character sprite
+        character_surface = pygame.Surface((32, 48), pygame.SRCALPHA)
+        
+        # Draw a simple character with blue and orange colors
+        # Head (blue)
+        pygame.draw.circle(character_surface, (100, 150, 255), (16, 12), 8)
+        
+        # Body (orange)
+        pygame.draw.rect(character_surface, (255, 165, 0), (12, 20, 8, 16))
+        
+        # Arms (orange)
+        pygame.draw.rect(character_surface, (255, 165, 0), (8, 22, 4, 12))
+        pygame.draw.rect(character_surface, (255, 165, 0), (20, 22, 4, 12))
+        
+        # Legs (blue)
+        pygame.draw.rect(character_surface, (100, 150, 255), (12, 36, 4, 12))
+        pygame.draw.rect(character_surface, (100, 150, 255), (16, 36, 4, 12))
+        
+        self.sunrise_character = character_surface
     
     def load_map(self):
-        """Load the forest map using the map loader"""
+        """Load the appropriate map based on current state"""
+        if self.current_map == "forest2":
+            map_file = 'forest2.json'  # First forest map
+        else:
+            map_file = 'night_time_map.json'  # Second forest map (night time)
+        
         # Load map data (this will also load all referenced tilesets)
-        if self.map_loader.load_map('forest2.json'):
-            print("Map loaded successfully")
+        if self.map_loader.load_map(map_file):
+            print(f"Map loaded successfully: {map_file}")
             
             # Create tiles from map data
-            self.map_tiles = self.map_loader.create_tiles_from_map([self.collision_sprite, self.enemy_sprite])
+            self.map_tiles = self.map_loader.create_tiles_from_map([self.visible_sprite, self.collision_sprite, self.enemy_sprite])
             
             # Create objects from map data (hearts, etc.)
             self.map_objects = self.map_loader.create_objects_from_map([self.hearts])
@@ -160,7 +239,125 @@ class Level:
             print(f"Created {len(self.map_objects)} map objects")
             print(f"Found {len(self.interactive_tiles)} interactive tiles")
         else:
-            print("Failed to load map data")
+            print(f"Failed to load map data: {map_file}")
+    
+    def check_map_transition(self):
+        """Check if player has reached the end of the current map and should transition"""
+        if self.map_transitioning:
+            return
+        
+        # Check if player has reached the end of the forest2 map
+        if self.current_map == "forest2":
+            # Get map width in pixels
+            map_width = self.map_loader.map_data.get('width', 0) * self.map_loader.map_data.get('tilewidth', 32)
+            
+            # Check if player is near the end of the map (within 100 pixels)
+            if self.player.rect.centerx >= map_width - 100:
+                self.start_map_transition()
+    
+    def start_map_transition(self):
+        """Start the transition to the night time forest map"""
+        if self.map_transitioning:
+            return
+        
+        print("Starting map transition to night time forest...")
+        self.map_transitioning = True
+        self.transition_timer = 0
+        self.transition_progress = 0.0
+        
+        # Clear current enemies and objects
+        self.enemies.empty()
+        self.hearts.empty()
+        self.player_arrows.empty()
+        
+        # Clear all map tiles from sprite groups
+        for tile in self.map_tiles:
+            tile.kill()  # Remove from all groups
+        self.map_tiles.clear()
+        
+        # Clear interactive tiles
+        self.interactive_tiles.clear()
+        
+        # Switch to night time forest map
+        self.current_map = "nighttime"
+        self.load_map()
+        
+        # Reposition player at the start of the new map
+        self.player.rect.centerx = 32
+        self.player.rect.bottom = 543
+        self.player.on_ground = True
+        self.player.vel_y = 0
+        
+        # Create new enemies for night time forest map
+        self.create_enemies()
+    
+    def update_map_transition(self):
+        """Update the map transition animation"""
+        if not self.map_transitioning:
+            return
+        
+        self.transition_timer += 1
+        self.transition_progress = min(self.transition_timer / self.transition_duration, 1.0)
+        
+        # Transition complete
+        if self.transition_progress >= 1.0:
+            self.map_transitioning = False
+            self.transition_timer = 0
+            self.transition_progress = 0.0
+            print("Map transition completed!")
+    
+    def draw_map_transition(self):
+        """Draw the map transition effect"""
+        if not self.map_transitioning:
+            return
+        
+        # Create transition overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        
+        # Fade effect during transition
+        if self.transition_progress < 0.5:
+            # Fade out current map
+            alpha = int(255 * (1.0 - (self.transition_progress * 2)))
+            overlay.set_alpha(alpha)
+            overlay.fill((0, 0, 0))
+            self.display_surface.blit(overlay, (0, 0))
+        else:
+            # Fade in new map
+            alpha = int(255 * ((self.transition_progress - 0.5) * 2))
+            overlay.set_alpha(255 - alpha)
+            overlay.fill((0, 0, 0))
+            self.display_surface.blit(overlay, (0, 0))
+        
+        # Draw transition text
+        font = pygame.font.Font(None, 48)
+        if self.current_map == "nighttime":
+            text = font.render("Night Falls...", True, (255, 255, 255))
+        else:
+            text = font.render("Entering Forest...", True, (255, 255, 255))
+        
+        text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        
+        # Add background for text
+        bg_rect = text_rect.inflate(40, 20)
+        pygame.draw.rect(self.display_surface, (0, 0, 0, 150), bg_rect)
+        pygame.draw.rect(self.display_surface, (255, 255, 255), bg_rect, 2)
+        
+        self.display_surface.blit(text, text_rect)
+    
+    def draw_sunrise_character(self):
+        """Draw the static sunrise character"""
+        if self.sunrise_character and self.current_map == "forest2":
+            # Position character at the end of the map
+            map_width = self.map_loader.map_data.get('width', 0) * self.map_loader.map_data.get('tilewidth', 32)
+            char_x = map_width - 100
+            char_y = 543 - 48  # Above ground level
+            
+            # Apply camera offset
+            screen_pos = self.camera.apply_pos((char_x, char_y))
+            
+            # Only draw if visible
+            if -32 < screen_pos[0] < WIDTH and -48 < screen_pos[1] < HEIGHT:
+                self.display_surface.blit(self.sunrise_character, screen_pos)
     
     def create_enemies(self):
         """Create enemies at various positions with waypoints"""
@@ -209,7 +406,7 @@ class Level:
                     # self.player.take_damage(projectile.damage)
                     projectile.kill()
     
-    def check_enemy_attack_collisions(self):
+    def check_enemy_attack_collisions(self, dialogue_active=False):
         """Check collisions between enemy attacks and player"""
         for enemy in self.enemies:
             if not enemy.is_alive:
@@ -220,7 +417,7 @@ class Level:
                 # Check if enemy can attack (not on cooldown)
                 if hasattr(enemy, 'can_attack') and enemy.can_attack(self.player):
                     # Player takes damage
-                    self.player.take_damage(enemy.attack_damage)
+                    self.player.take_damage(enemy.attack_damage, dialogue_active)
                     print(f"Player hit by {enemy.enemy_type}! Health: {self.player.health}/{self.player.max_health}")
                     
                     # Flash health UI
@@ -231,23 +428,31 @@ class Level:
     
     def check_heart_collisions(self):
         """Check collisions between player and heart objects"""
-        for heart in self.hearts:
-            heart.update(self.player)
+        # Only check heart collisions if hearts are unlocked
+        if self.player.can_use_hearts:
+            for heart in self.hearts:
+                heart.update(self.player)
     
     def check_bow_attacks(self):
         """Handle bow attacks and arrow shooting"""
         if (self.player.attacking and 
             self.player.get_current_weapon() == 'bow'):
             
+            print(f"🎯 BOW ATTACK: attacking=True, weapon=bow, attack_index={self.player.attack_index}, arrow_fired={getattr(self, 'arrow_fired_this_attack', False)}")
+            
             # Fire arrow at frame 8 (or any frame >= 8 if animation is shorter)
             if (int(self.player.attack_index) >= 8 and 
-                not getattr(self, 'arrow_fired_this_attack', False)):  # Fire at frame 8 or later, only once per attack
+                not getattr(self, 'arrow_fired_this_attack', False)):  # Fire at frame 8 or later, only once per attack                                                                                                 
                 
+                print(f"🎯 FIRING ARROW AT FRAME {int(self.player.attack_index)}!")
                 # Shoot arrow
                 arrow = self.bow.shoot_arrow(self.player.rect, self.player.facing_right)
                 if arrow:
                     self.player_arrows.add(arrow)
                     self.arrow_fired_this_attack = True  # Prevent multiple arrows
+                    print(f"🎯 ARROW ADDED TO LEVEL! Total arrows: {len(self.player_arrows)}")
+                else:
+                    print(f"🎯 FAILED TO ADD ARROW TO LEVEL!")
         
         # Reset flag when attack ends
         if not self.player.attacking:
@@ -328,6 +533,43 @@ class Level:
 
     def check_interactions(self, keys):
         """Check if player is near interactive tiles and handle interactions"""
+        # Handle story dialogue first
+        if self.show_intro_dialogue or self.story_dialogue_active:
+            # R key for starting/continuing story dialogue
+            if keys[pygame.K_r] and not self.r_pressed:
+                if self.show_intro_dialogue:
+                    self.end_intro_dialogue()  # End intro dialogue when R is pressed
+                else:
+                    self.next_story_dialogue()
+                self.r_pressed = True
+            elif not keys[pygame.K_r]:
+                self.r_pressed = False
+            
+            # Z key for continuing story dialogue
+            if keys[pygame.K_z] and not self.z_pressed:
+                if self.show_intro_dialogue:
+                    self.end_intro_dialogue()  # End intro dialogue when Z is pressed
+                else:
+                    self.next_story_dialogue()
+                self.z_pressed = True
+            elif not keys[pygame.K_z]:
+                self.z_pressed = False
+            
+            # ENTER key for continuing story dialogue
+            if keys[pygame.K_RETURN] and not self.enter_pressed:
+                if self.show_intro_dialogue:
+                    self.end_intro_dialogue()  # End intro dialogue when ENTER is pressed
+                else:
+                    self.next_story_dialogue()
+                self.enter_pressed = True
+            elif not keys[pygame.K_RETURN]:
+                self.enter_pressed = False
+            
+            # ESC key for exiting story dialogue
+            if keys[pygame.K_ESCAPE]:
+                self.end_story_dialogue()
+            return
+        
         # Check if player is near any interactive tile
         self.nearby_interactive = None
         interaction_distance = 50  # Distance in pixels to trigger interaction
@@ -390,9 +632,109 @@ class Level:
         self.current_dialogue = None
         self.dialogue_index = 0
     
+    def start_story_dialogue(self, story_part):
+        """Start story dialogue for the given story part"""
+        dialogue = self.story_progression.get_story_dialogue(story_part)
+        if dialogue:
+            print(f"Starting story dialogue for part {story_part}, {len(dialogue)} lines")
+            self.current_story_dialogue = dialogue
+            self.story_dialogue_index = 0
+            self.story_dialogue_active = True
+            self.show_intro_dialogue = False
+    
+    def next_story_dialogue(self):
+        """Move to next story dialogue line"""
+        if self.story_dialogue_active and self.current_story_dialogue:
+            self.story_dialogue_index += 1
+            print(f"Story dialogue index: {self.story_dialogue_index}/{len(self.current_story_dialogue)}")
+            if self.story_dialogue_index >= len(self.current_story_dialogue):
+                print("Ending story dialogue - reached end")
+                self.end_story_dialogue()
+    
+    def end_story_dialogue(self):
+        """End current story dialogue"""
+        print("Ending story dialogue - movement should be restored")
+        self.story_dialogue_active = False
+        self.current_story_dialogue = None
+        self.story_dialogue_index = 0
+        self.show_intro_dialogue = False
+    
+    def end_intro_dialogue(self):
+        """End intro dialogue"""
+        self.show_intro_dialogue = False
+    
     def draw_ui(self):
         """Draw interaction prompts and dialogue"""
         font = pygame.font.Font(None, 36)
+        
+        # Draw story dialogue
+        if self.show_intro_dialogue or self.story_dialogue_active:
+            if self.show_intro_dialogue:
+                # Get intro dialogue from story progression
+                intro_dialogue = self.story_progression.get_intro_dialogue()
+                dialogue_text = "\n".join(intro_dialogue)
+            elif self.story_dialogue_active and self.current_story_dialogue:
+                dialogue_text = self.current_story_dialogue[self.story_dialogue_index]
+            else:
+                dialogue_text = ""
+            
+            if dialogue_text:
+                # Create story dialogue box (smaller and positioned 70px up)
+                # Make it taller for intro dialogue and story dialogues with controls
+                if self.show_intro_dialogue:
+                    box_height = 200
+                elif self.story_dialogue_active:
+                    box_height = 250  # Taller for story dialogues with controls
+                else:
+                    box_height = 150
+                dialogue_rect = pygame.Rect(50, HEIGHT - 320, WIDTH - 100, box_height)
+                pygame.draw.rect(self.display_surface, (0, 0, 0, 220), dialogue_rect)
+                pygame.draw.rect(self.display_surface, (255, 215, 0), dialogue_rect, 4)  # Gold border
+                
+                # Draw dialogue text (wrapped)
+                words = dialogue_text.split()
+                lines = []
+                current_line = ""
+                
+                for word in words:
+                    test_line = current_line + (" " if current_line else "") + word
+                    if font.size(test_line)[0] < dialogue_rect.width - 20:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+                if current_line:
+                    lines.append(current_line)
+                
+                # Draw each line
+                y_offset = dialogue_rect.y + 15
+                # More lines for intro and story dialogues with controls
+                max_lines = 6 if self.show_intro_dialogue else 8 if self.story_dialogue_active else 3
+                for i, line in enumerate(lines[:max_lines]):
+                    # Style controls differently
+                    if (self.show_intro_dialogue and line in ["CONTROLS:", "Arrow Keys - Move Left/Right", "SPACE - Jump", "F - Attack with Sword"]) or \
+                       (self.story_dialogue_active and line in ["HEART CONTROLS:", "BOW CONTROLS:", "I - Open/Close Inventory", "1-0 - Select Heart Slot", "W - Use Selected Heart", "E - Switch Sword/Bow", "F - Fire Arrow (when bow selected)", "Arrow Keys - Aim Direction"]):
+                        if line in ["CONTROLS:", "HEART CONTROLS:", "BOW CONTROLS:"]:
+                            text_color = (255, 215, 0)  # Gold for title
+                        else:
+                            text_color = (200, 255, 200)  # Light green for controls
+                    else:
+                        text_color = (255, 255, 255)  # White for regular text
+                    
+                    text_surface = font.render(line, True, text_color)
+                    text_rect = text_surface.get_rect(centerx=dialogue_rect.centerx, y=y_offset)
+                    self.display_surface.blit(text_surface, text_rect)
+                    y_offset += 25
+                
+                # Draw continue prompt
+                if self.show_intro_dialogue:
+                    continue_text = font.render("Press R to begin", True, (255, 215, 0))
+                else:
+                    continue_text = font.render("Press R, Z, or ENTER to continue", True, (200, 200, 200))
+                continue_rect = continue_text.get_rect(centerx=dialogue_rect.centerx, y=dialogue_rect.bottom - 25)
+                self.display_surface.blit(continue_text, continue_rect)
+            return
         
         # Draw interaction prompt
         if self.show_interaction_prompt:
@@ -406,7 +748,7 @@ class Level:
             
             self.display_surface.blit(prompt_text, prompt_rect)
         
-        # Draw dialogue
+        # Draw regular dialogue
         if self.dialogue_active and self.current_dialogue:
             dialogue_text = self.current_dialogue[self.dialogue_index]
             
@@ -444,6 +786,107 @@ class Level:
             continue_rect = continue_text.get_rect(centerx=dialogue_rect.centerx, y=dialogue_rect.bottom - 30)
             self.display_surface.blit(continue_text, continue_rect)
 
+    def initialize_game_data(self):
+        """Initialize all game data through API"""
+        if self.game_data_initialized:
+            return
+            
+        try:
+            # Initialize all game data through API
+            init_result = self.api_client.initialize_game_data()
+            
+            if init_result["success"]:
+                self.api_connected = True
+                self.player_data_synced = True
+                self.game_data_initialized = True
+                self.player_progress = init_result
+                print("✅ Game data initialized successfully")
+            else:
+                self.api_connected = False
+                print(f"❌ Failed to initialize game data: {init_result.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            self.api_connected = False
+            print(f"❌ Unexpected error initializing game data: {e}")
+    
+    def save_game_session(self):
+        """Save complete game session through API"""
+        if not self.api_connected or self.score_saved:
+            return
+            
+        try:
+            # Calculate survival time in seconds
+            survival_time = (pygame.time.get_ticks() - self.start_time) / 1000.0 if self.start_time > 0 else 0
+            
+            # Prepare comprehensive score data
+            score_data = {
+                "score_value": self.score,
+                "time_played": survival_time,
+                "enemies_killed": self.enemies_hit,
+                "max_combo": self.max_combo,
+                "survival_time": survival_time
+            }
+            
+            # Calculate currency reward based on score
+            currency_result = self.api_client.calculate_currency(self.score)
+            if currency_result.get("currency_earned", 0) > 0:
+                print(f"💰 Earned {currency_result['currency_earned']} coins! ({currency_result['rule_applied']})")
+                self.currency_earned = currency_result['currency_earned']
+                self.currency_rule = currency_result['rule_applied']
+            else:
+                print(f"💰 No currency earned: {currency_result.get('message', 'Unknown reason')}")
+                self.currency_earned = 0
+                self.currency_rule = None
+            
+            # Save complete game session
+            save_result = self.api_client.save_game_session(score_data)
+            
+            if save_result["success"]:
+                self.score_saved = True
+                print(f"✅ Game session saved successfully")
+            else:
+                print(f"❌ Failed to save game session: {save_result.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            print(f"❌ Unexpected error saving game session: {e}")
+    
+    def get_leaderboard_data(self, limit=10):
+        """Get leaderboard data from API"""
+        if not self.api_connected:
+            return []
+            
+        try:
+            return self.api_client.get_leaderboard(limit=limit)
+        except Exception as e:
+            print(f"❌ Failed to get leaderboard: {e}")
+            return []
+    
+    def get_player_progress(self):
+        """Get comprehensive player progress from API"""
+        if not self.api_connected:
+            return None
+            
+        try:
+            return self.api_client.get_player_progress()
+        except Exception as e:
+            print(f"❌ Failed to get player progress: {e}")
+            return None
+    
+    def update_player_data(self, player_data=None, game_settings=None):
+        """Update player data through API"""
+        if not self.api_connected:
+            return False
+            
+        try:
+            result = self.api_client.create_or_update_player(player_data, game_settings)
+            if result:
+                print("✅ Player data updated successfully")
+                return True
+            return False
+        except Exception as e:
+            print(f"❌ Failed to update player data: {e}")
+            return False
+
     def run(self, keys, collision_sprites):
         #run whole game(level)
         
@@ -454,10 +897,21 @@ class Level:
         # Check if game is over
         if self.player.health <= 0:
             self.game_over = True
+            # Save complete game session when game over
+            self.save_game_session()
+            # Don't show story dialogue during death screen - it will be shown after restart
             # Don't return here - let the game over screen be drawn
         
         # Update player with proper argumentalsono 
-        self.player.update(keys, collision_sprites, self.enemy_sprite)
+        # Check if any dialogue is active
+        dialogue_active = self.show_intro_dialogue or self.story_dialogue_active
+        self.player.update(keys, collision_sprites, self.enemy_sprite, dialogue_active)
+        
+        # Update player's story progression abilities
+        self.player.update_story_progression()
+        
+        # Sync inventory with story progress for real-time updates
+        self.player.sync_inventory_from_story_progress()
         
         # Update enemies
         for enemy in self.enemies:
@@ -472,7 +926,9 @@ class Level:
         # Check collisions
         self.check_projectile_collisions()
         self.check_attack_collisions()
-        self.check_enemy_attack_collisions()
+        # Check if any dialogue is active
+        dialogue_active = self.show_intro_dialogue or self.story_dialogue_active
+        self.check_enemy_attack_collisions(dialogue_active)
         self.check_heart_collisions()
         
         # Update bow and check bow attacks and arrow collisions
@@ -482,6 +938,12 @@ class Level:
         
         # Check interactions
         self.check_interactions(keys)
+        
+        # Check for map transition
+        self.check_map_transition()
+        
+        # Update map transition
+        self.update_map_transition()
         
         # Update camera to follow player
         self.camera.update(self.player)
@@ -497,11 +959,12 @@ class Level:
                 screen_pos.y > -32 and screen_pos.y < HEIGHT):
                 self.display_surface.blit(tile.image, screen_pos)
         
-        # Draw hearts
-        for heart in self.hearts:
-            if not heart.collected:
-                screen_pos = self.camera.apply(heart)
-                heart.draw(self.display_surface, screen_pos)
+        # Draw hearts only if hearts are unlocked
+        if self.player.can_use_hearts:
+            for heart in self.hearts:
+                if not heart.collected:
+                    screen_pos = self.camera.apply(heart)
+                    heart.draw(self.display_surface, screen_pos)
         
         # Draw enemies (only alive ones)
         for enemy in self.enemies:
@@ -519,9 +982,8 @@ class Level:
         screen_pos = self.camera.apply(self.player)
         self.display_surface.blit(self.player.image, screen_pos)
         
-        # Draw player arrows (after player so they're visible)
-        for arrow in self.player_arrows:
-            arrow.draw(self.display_surface, self.camera)
+        # Draw sunrise character (only during daytime)
+        self.draw_sunrise_character()
         
         # Draw UI elements
         self.draw_ui()
@@ -531,6 +993,22 @@ class Level:
         
         # Draw score popups
         self.draw_score_popups()
+        
+        # Draw inventory UI only if hearts are unlocked
+        if self.player.can_use_hearts:
+            self.player.draw_inventory(self.display_surface)
+        
+        # Draw map transition effect
+        self.draw_map_transition()
+        
+        # Draw player arrows
+        if len(self.player_arrows) > 0:
+            print(f"🎯 DRAWING {len(self.player_arrows)} arrows")
+            for arrow in self.player_arrows:
+                print(f"🎯 Drawing arrow at {arrow.rect}")
+                arrow.draw(self.display_surface, self.camera)
+        else:
+            print(f"🎯 NO ARROWS TO DRAW")
         
         # Draw game over screen on top of everything
         if self.game_over:
@@ -713,9 +1191,13 @@ class Level:
         
         self.display_surface.blit(game_over_text, game_over_rect)
         
-        you_died_text = font_medium.render("You Died!", True, (255, 255, 255))
+        you_died_text = font_medium.render("Luna Has Fallen...", True, (255, 255, 255))
         you_died_rect = you_died_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 60))
         self.display_surface.blit(you_died_text, you_died_rect)
+        
+        learning_text = font_small.render("But each fall teaches her something new...", True, (200, 200, 200))
+        learning_rect = learning_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 20))
+        self.display_surface.blit(learning_text, learning_rect)
         
         # Score breakdown
         score_breakdown = self.get_score_breakdown()
@@ -745,15 +1227,43 @@ class Level:
         self.display_surface.blit(combo_text, combo_rect)
         
         # Restart instruction with more space
-        restart_text = font_small.render("Press R to restart or ESC to exit", True, (200, 200, 200))
+        restart_text = font_small.render("Press R for Luna to try again or ESC to exit", True, (200, 200, 200))
         restart_rect = restart_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing * 3 + 20))
         self.display_surface.blit(restart_text, restart_rect)
         
         # Add blinking effect for restart instruction
         import time
         if int(time.time() * 2) % 2:  # Blink every 0.5 seconds
-            restart_text = font_small.render("Press R to restart or ESC to exit", True, (255, 255, 255))
+            restart_text = font_small.render("Press R for Luna to try again or ESC to exit", True, (255, 255, 255))
             self.display_surface.blit(restart_text, restart_rect)
+        
+        # Currency and API Status
+        api_y = stats_y + stats_spacing * 4 + 40
+        
+        # Currency earned display
+        if self.currency_earned > 0:
+            currency_text = font_medium.render(f"💰 +{self.currency_earned} Coins Earned!", True, (255, 215, 0))
+            currency_rect = currency_text.get_rect(center=(WIDTH//2, api_y))
+            self.display_surface.blit(currency_text, currency_rect)
+            
+            if self.currency_rule:
+                rule_text = font_small.render(f"({self.currency_rule})", True, (200, 200, 200))
+                rule_rect = rule_text.get_rect(center=(WIDTH//2, api_y + 30))
+                self.display_surface.blit(rule_text, rule_rect)
+        else:
+            no_currency_text = font_small.render("No coins earned this round", True, (150, 150, 150))
+            no_currency_rect = no_currency_text.get_rect(center=(WIDTH//2, api_y))
+            self.display_surface.blit(no_currency_text, no_currency_rect)
+        
+        # API Connection Status
+        api_status_y = api_y + 60
+        if self.api_connected:
+            api_status_text = font_small.render("✓ Score and currency saved", True, (100, 255, 100))
+        else:
+            api_status_text = font_small.render("✗ Offline mode - data not saved", True, (255, 100, 100))
+        
+        api_status_rect = api_status_text.get_rect(center=(WIDTH//2, api_status_y))
+        self.display_surface.blit(api_status_text, api_status_rect)
 
     def add_score(self, points, reason="kill", position=None):
         """Add points to score with combo system"""

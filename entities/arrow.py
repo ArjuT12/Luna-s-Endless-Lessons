@@ -13,6 +13,7 @@ class Arrow(pygame.sprite.Sprite):
         self.speed = speed
         self.direction = direction  # 1 for right, -1 for left
         
+        print(f"🎯 ARROW CREATED: pos=({x}, {y}), direction={direction}, speed={speed}")
         
         # Load arrow sprite
         self.image = pygame.image.load("Arrow01(32x32).png").convert_alpha()
@@ -27,6 +28,8 @@ class Arrow(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.centerx = x
         self.rect.centery = y
+        
+        print(f"🎯 ARROW RECT: {self.rect}, image_size: {self.image.get_size()}")
         
         # Physics
         self.vel_x = direction * speed
@@ -79,6 +82,8 @@ class Arrow(pygame.sprite.Sprite):
         """Draw arrow on screen"""
         # Use the same camera.apply method as other entities
         screen_pos = camera.apply(self)
+        
+        print(f"🎯 ARROW DRAW: world_pos={self.rect}, screen_pos={screen_pos}")
         
         # Draw the arrow image
         screen.blit(self.image, screen_pos)

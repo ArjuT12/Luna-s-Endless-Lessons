@@ -45,18 +45,31 @@ class Bow(pygame.sprite.Sprite):
     
     def shoot_arrow(self, player_rect, player_facing_right):
         """Create and shoot an arrow"""
+        print(f"🏹 BOW SHOOT: cooldown={self.shoot_cooldown}, player_rect={player_rect}, facing_right={player_facing_right}")
+        
         if self.shoot_cooldown <= 0:
-            # Calculate arrow spawn position (at player center)
+            # Calculate arrow spawn position (at player center, 20px lower)
             direction = 1 if player_facing_right else -1
             arrow_x = player_rect.centerx  # Start from player center
-            arrow_y = player_rect.centery  # Start from player center
+            arrow_y = player_rect.centery + 70 # Start from player center, 20px lower
+
+            print(f"🏹 BOW SHOOTING arrow at ({arrow_x}, {arrow_y}) direction {direction}")
+            print(f"🏹 Player rect: {player_rect}")
             
             # Create arrow
             arrow = Arrow(arrow_x, arrow_y, direction)
-            self.arrows.add(arrow)
-            self.shoot_cooldown = self.shoot_delay
-            return arrow
-        return None
+            if arrow:
+                self.arrows.add(arrow)
+                self.shoot_cooldown = self.shoot_delay
+                print(f"🏹 Arrow added to group, total arrows: {len(self.arrows)}")
+                print(f"🏹 Arrow group contents: {list(self.arrows)}")
+                return arrow
+            else:
+                print(f"🏹 FAILED TO CREATE ARROW!")
+                return None
+        else:
+            print(f"🏹 BOW ON COOLDOWN: {self.shoot_cooldown}")
+            return None
     
     def is_attacking(self):
         return self.attacking

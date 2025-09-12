@@ -92,12 +92,31 @@ class Heart(pygame.sprite.Sprite):
             self.collect(player)
     
     def collect(self, player):
-        """Collect the heart and restore player health"""
-        if not self.collected and player.health < player.max_health:
-            player.health = min(player.max_health, player.health + self.heal_amount)
-            self.collected = True
-            self.kill()  # Remove from all groups
-            print(f"Heart collected! Player health: {player.health}/{player.max_health}")
+        """Collect the heart and add to inventory"""
+        if not self.collected:
+            # Check if player can use hearts (unlocked through story progression)
+            if hasattr(player, 'can_use_hearts') and not player.can_use_hearts:
+                print("Hearts not yet unlocked! Cannot collect heart.")
+                return
+                
+            # Add heart to player's inventory instead of directly healing
+            if hasattr(player, 'inventory'):
+                if player.inventory.add_item('heart', 1):
+                    self.collected = True
+                    self.kill()  # Remove from all groups
+                    print(f"Heart collected! Hearts in inventory: {player.inventory.get_item_quantity('heart')}")
+                    # Save inventory after collecting heart
+                    if hasattr(player, 'save_inventory'):
+                        player.save_inventory()
+                else:
+                    print("Inventory is full! Cannot collect heart.")
+            else:
+                # Fallback to old behavior if no inventory system
+                if player.health < player.max_health:
+                    player.health = min(player.max_health, player.health + self.heal_amount)
+                    self.collected = True
+                    self.kill()  # Remove from all groups
+                    print(f"Heart collected! Player health: {player.health}/{player.max_health}")
     
     def draw(self, surface, camera_offset):
         """Draw the heart with camera offset"""

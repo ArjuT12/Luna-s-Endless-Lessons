@@ -17,6 +17,10 @@ class Camera:
 
     def apply(self, entity):
         return entity.rect.move(self.camera.topleft)
+    
+    def apply_pos(self, pos):
+        """Apply camera offset to a position tuple (x, y)"""
+        return (pos[0] + self.camera.x, pos[1] + self.camera.y)
 
     def update(self, target):
         # Calculate target position
