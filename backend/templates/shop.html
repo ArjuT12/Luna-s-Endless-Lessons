@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luna's Heart Shop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .shop-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .shop-header {
+            margin-bottom: 30px;
+        }
+
+        .shop-title {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .shop-subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .heart-icon {
+            font-size: 3em;
+            color: #e74c3c;
+            margin: 20px 0;
+            animation: heartbeat 2s infinite;
+        }
+
+        @keyframes heartbeat {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .item-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .item-card:hover {
+            border-color: #e74c3c;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(231, 76, 60, 0.2);
+        }
+
+        .item-name {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .item-description {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .item-price {
+            font-size: 1.8em;
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #e74c3c;
+        }
+
+        .quantity-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .quantity-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .quantity-btn:hover {
+            background: #c0392b;
+        }
+
+        .quantity-display {
+            font-size: 1.2em;
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .buy-btn {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .buy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(231, 76, 60, 0.3);
+        }
+
+        .buy-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .player-info {
+            background: #e8f4fd;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+
+        .currency-display {
+            font-size: 1.3em;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="shop-container">
+        <div class="shop-header">
+            <div class="heart-icon">❤️</div>
+            <h1 class="shop-title">Luna's Heart Shop</h1>
+            <p class="shop-subtitle">Restore your health and continue your
+                endless lesson</p>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="item-card">
+            <h3 class="item-name">Heart</h3>
+            <p class="item-description">Restores 25 health points. Essential for
+                survival in Luna's endless lesson.</p>
+            <div class="item-price" id="itemPrice">Loading...</div>
+
+            <form id="purchaseForm">
+                <div class="form-group">
+                    <label for="systemId" class="form-label">Your System
+                        ID:</label>
+                    <input type="text" id="systemId" class="form-input"
+                        placeholder="Enter your system ID" required>
+                </div>
+
+                <div class="quantity-group">
+                    <button type="button" class="quantity-btn"
+                        id="decreaseBtn">-</button>
+                    <span class="quantity-display" id="quantityDisplay">1</span>
+                    <button type="button" class="quantity-btn"
+                        id="increaseBtn">+</button>
+                    <span
+                        style="margin-left: 10px; color: #666;">Quantity</span>
+                </div>
+
+                <button type="submit" class="buy-btn" id="buyBtn">
+                    <span id="buyText">Buy Heart(s)</span>
+                    <span class="loading" id="loading">Processing...</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="player-info" id="playerInfo" style="display: none;">
+            <h4>Player Information</h4>
+            <div class="currency-display" id="playerCurrency">Currency:
+                Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentQuantity = 1;
+        let heartItem = null;
+        let playerData = null;
+
+        // DOM elements
+        const quantityDisplay = document.getElementById('quantityDisplay');
+        const decreaseBtn = document.getElementById('decreaseBtn');
+        const increaseBtn = document.getElementById('increaseBtn');
+        const itemPrice = document.getElementById('itemPrice');
+        const buyBtn = document.getElementById('buyBtn');
+        const buyText = document.getElementById('buyText');
+        const loading = document.getElementById('loading');
+        const messageDiv = document.getElementById('message');
+        const playerInfo = document.getElementById('playerInfo');
+        const playerCurrency = document.getElementById('playerCurrency');
+        const systemIdInput = document.getElementById('systemId');
+
+        // Initialize the shop
+        async function initShop() {
+            try {
+                // Load shop items
+                const response = await fetch('/api/items');
+                const data = await response.json();
+
+                if (data.items && data.items.length > 0) {
+                    // Find the Heart item
+                    heartItem = data.items.find(item => item.name === 'Heart');
+                    if (heartItem) {
+                        itemPrice.textContent = `${heartItem.base_price} coins`;
+                        updateTotalPrice();
+                    } else {
+                        showMessage('Heart item not found in shop', 'error');
+                    }
+                } else {
+                    showMessage('No items available in shop', 'error');
+                }
+            } catch (error) {
+                showMessage('Failed to load shop items: ' + error.message, 'error');
+            }
+        }
+
+        // Update total price display
+        function updateTotalPrice() {
+            if (heartItem) {
+                const totalPrice = heartItem.base_price * currentQuantity;
+                itemPrice.textContent = `${totalPrice} coins (${heartItem.base_price} × ${currentQuantity})`;
+            }
+        }
+
+        // Show message to user
+        function showMessage(text, type) {
+            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        // Check player data
+        async function checkPlayer(systemId) {
+            try {
+                const response = await fetch(`/api/player/${systemId}`);
+                if (response.ok) {
+                    playerData = await response.json();
+                    playerCurrency.textContent = `Currency: ${playerData.currency || 0} coins`;
+                    playerInfo.style.display = 'block';
+                    return true;
+                } else {
+                    showMessage('Player not found. Please check your System ID.', 'error');
+                    return false;
+                }
+            } catch (error) {
+                showMessage('Failed to check player: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // Purchase item
+        async function purchaseItem(systemId, quantity) {
+            try {
+                const response = await fetch('/api/shop/purchase', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        system_id: systemId,
+                        item_id: heartItem.item_id.$oid,
+                        quantity: quantity
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Successfully purchased ${quantity} heart(s) for ${result.item.total_cost} coins! Remaining currency: ${result.remaining_currency} coins`, 'success');
+                    // Update player info
+                    if (playerData) {
+                        playerData.currency = result.remaining_currency;
+                        playerCurrency.textContent = `Currency: ${playerData.currency} coins`;
+                    }
+                } else {
+                    showMessage(result.error || 'Purchase failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Purchase failed: ' + error.message, 'error');
+            }
+        }
+
+        // Event listeners
+        decreaseBtn.addEventListener('click', () => {
+            if (currentQuantity > 1) {
+                currentQuantity--;
+                quantityDisplay.textContent = currentQuantity;
+                updateTotalPrice();
+            }
+        });
+
+        increaseBtn.addEventListener('click', () => {
+            currentQuantity++;
+            quantityDisplay.textContent = currentQuantity;
+            updateTotalPrice();
+        });
+
+        // Form submission
+        document.getElementById('purchaseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const systemId = systemIdInput.value.trim();
+            if (!systemId) {
+                showMessage('Please enter your System ID', 'error');
+                return;
+            }
+
+            if (!heartItem) {
+                showMessage('Heart item not available', 'error');
+                return;
+            }
+
+            // Show loading state
+            buyBtn.disabled = true;
+            buyText.style.display = 'none';
+            loading.style.display = 'inline';
+
+            try {
+                // Check if player exists and has enough currency
+                const playerExists = await checkPlayer(systemId);
+                if (playerExists) {
+                    const totalCost = heartItem.base_price * currentQuantity;
+                    if (playerData.currency < totalCost) {
+                        showMessage(`Insufficient currency. You have ${playerData.currency} coins but need ${totalCost} coins.`, 'error');
+                    } else {
+                        await purchaseItem(systemId, currentQuantity);
+                    }
+                }
+            } finally {
+                // Reset loading state
+                buyBtn.disabled = false;
+                buyText.style.display = 'inline';
+                loading.style.display = 'none';
+            }
+        });
+
+        // Initialize shop when page loads
+        initShop();
+    </script>
+</body>
+
+</html>

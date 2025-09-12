@@ -982,6 +982,8 @@ class Level:
         screen_pos = self.camera.apply(self.player)
         self.display_surface.blit(self.player.image, screen_pos)
         
+        # Weapon animation is handled by the player sprite itself
+        
         # Draw sunrise character (only during daytime)
         self.draw_sunrise_character()
         

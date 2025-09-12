@@ -48,10 +48,14 @@ class Bow(pygame.sprite.Sprite):
         print(f"🏹 BOW SHOOT: cooldown={self.shoot_cooldown}, player_rect={player_rect}, facing_right={player_facing_right}")
         
         if self.shoot_cooldown <= 0:
-            # Calculate arrow spawn position (at player center, 20px lower)
+            
+            # Calculate arrow spawn position (slightly away from player to avoid collision)
             direction = 1 if player_facing_right else -1
-            arrow_x = player_rect.centerx  # Start from player center
-            arrow_y = player_rect.centery + 70 # Start from player center, 20px lower
+            arrow_x = player_rect.centerx + (direction * 30)  # Start 30 pixels away from player center
+            
+            # Make Y position more flexible - ensure it's within reasonable bounds
+            base_y = player_rect.centery + 50  # Start from player center, slightly higher
+            arrow_y = base_y   # You can adjust this value as needed
 
             print(f"🏹 BOW SHOOTING arrow at ({arrow_x}, {arrow_y}) direction {direction}")
             print(f"🏹 Player rect: {player_rect}")

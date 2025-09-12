@@ -5,7 +5,7 @@ from config import *
 class Arrow(pygame.sprite.Sprite):
     """Arrow projectile class for bow weapon"""
     
-    def __init__(self, x, y, direction, speed=6):
+    def __init__(self, x, y, direction, speed=12):
         super().__init__()
         
         # Arrow properties
@@ -13,13 +13,12 @@ class Arrow(pygame.sprite.Sprite):
         self.speed = speed
         self.direction = direction  # 1 for right, -1 for left
         
-        print(f"🎯 ARROW CREATED: pos=({x}, {y}), direction={direction}, speed={speed}")
         
         # Load arrow sprite
         self.image = pygame.image.load("Arrow01(32x32).png").convert_alpha()
         
-        # Scale the arrow to appropriate size (4 times the original size)
-        self.image = pygame.transform.scale(self.image, (128, 128))
+        # Scale the arrow to appropriate size (3x larger)
+        self.image = pygame.transform.scale(self.image, (96, 96))
         
         # Flip arrow based on direction
         if direction < 0:
@@ -28,8 +27,6 @@ class Arrow(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.centerx = x
         self.rect.centery = y
-        
-        print(f"🎯 ARROW RECT: {self.rect}, image_size: {self.image.get_size()}")
         
         # Physics
         self.vel_x = direction * speed
@@ -52,11 +49,14 @@ class Arrow(pygame.sprite.Sprite):
         # Move arrow horizontally only (no gravity)
         self.rect.centerx += self.vel_x
         
-        # Check collision with walls/terrain
-        for sprite in collision_sprites:
-            if self.rect.colliderect(sprite.rect):
-                self.kill()
-                return
+        # Check collision with walls/terrain (with more leeway)
+        # for sprite in collision_sprites:
+        #     if self.rect.colliderect(sprite.rect):
+        #         # Give more leeway - only kill if arrow is significantly overlapping
+        #         overlap = self.rect.clip(sprite.rect)
+        #         if overlap.width > 30 or overlap.height > 30:  # Only kill if overlap is substantial (increased leeway)
+        #             self.kill()
+        #             return
         
         # Check if arrow is too old
         if self.age >= self.lifetime:
@@ -73,17 +73,16 @@ class Arrow(pygame.sprite.Sprite):
                     self.kill()
                     return
         
-        # Check if arrow is out of bounds (use much larger bounds for scrolling world)
-        if (self.rect.right < -1000 or self.rect.left > 5000 or 
-            self.rect.bottom < -1000 or self.rect.top > 2000):
+        # Check if arrow is out of bounds (use much larger world bounds)
+        if (self.rect.right < -1000 or self.rect.left > 10000 or 
+            self.rect.bottom < -1000 or self.rect.top > 10000):
             self.kill()
     
     def draw(self, screen, camera):
         """Draw arrow on screen"""
-        # Use the same camera.apply method as other entities
-        screen_pos = camera.apply(self)
-        
-        print(f"🎯 ARROW DRAW: world_pos={self.rect}, screen_pos={screen_pos}")
+        screen_pos = self.rect.copy()
+        screen_pos.x -= camera.camera.x
+        screen_pos.y -= camera.camera.y
         
         # Draw the arrow image
         screen.blit(self.image, screen_pos)

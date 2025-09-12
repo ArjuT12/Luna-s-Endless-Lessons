@@ -99,7 +99,8 @@ class StoryProgression:
                 "Luna, your persistence has impressed me...",
                 "You have learned the value of healing.",
                 "Now I grant you the ancient bow and arrows.",
-                "",
+                "A Special bow for you, Luna!",
+                "This bow can shoot arrows that pierce through walls.",
                 "BOW CONTROLS:",
                 "E - Switch Sword/Bow",
                 "F - Fire Arrow (when bow selected)",
@@ -121,8 +122,7 @@ class StoryProgression:
             "SPACE - Jump",
             "F - Attack with Sword",
             "",
-            "Luna will face many challenges ahead.",
-            "Each death teaches her something new.",
+            
             "Press R to begin Luna's journey!"
         ]
     
