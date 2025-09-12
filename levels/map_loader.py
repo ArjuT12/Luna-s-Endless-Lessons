@@ -224,6 +224,44 @@ class MapLoader:
         print(f"Created {len(tiles)} tiles from map data")
         return tiles
     
+    def create_objects_from_map(self, groups):
+        """Create object sprites from object layers in the map data"""
+        if not self.map_data:
+            print("No map data loaded")
+            return []
+        
+        objects = []
+        
+        # Process each layer
+        for layer in self.map_data.get('layers', []):
+            if layer.get('type') == 'objectgroup':
+                layer_name = layer.get('name', '')
+                print(f"Processing object layer: {layer_name}")
+                
+                # Process objects in this layer
+                for obj in layer.get('objects', []):
+                    obj_type = obj.get('type', '')
+                    obj_name = obj.get('name', '')
+                    obj_x = obj.get('x', 0)
+                    obj_y = obj.get('y', 0)
+                    obj_width = obj.get('width', 32)
+                    obj_height = obj.get('height', 32)
+                    obj_gid = obj.get('gid', 0)
+                    
+                    print(f"Object: {obj_name} (type: {obj_type}, gid: {obj_gid}) at ({obj_x}, {obj_y})")
+                    
+                    # Create heart objects for Health layer
+                    if layer_name.lower() == 'health' or obj_type.lower() == 'heart' or obj_gid == 117:
+                        from entities.heart import Heart
+                        # Adjust Y position to place heart 20 pixels above the floor
+                        heart_y = obj_y - 20
+                        heart = Heart(obj_x, heart_y, groups)
+                        objects.append(heart)
+                        print(f"Created heart object at ({obj_x}, {heart_y}) (adjusted from {obj_y})")
+        
+        print(f"Created {len(objects)} objects from map data")
+        return objects
+    
     def get_visible_tiles(self, camera_rect, tiles):
         """Get tiles that are visible within the camera view"""
         visible_tiles = []

@@ -3,6 +3,8 @@ from config import *
 from entities.player import Player
 from entities.enemy import Enemy
 from entities.enemy_factory import EnemyFactory
+from entities.bow import Bow
+from entities.arrow import Arrow
 from levels.tile import Tile
 from levels.camera import Camera
 from levels.map_loader import MapLoader
@@ -22,6 +24,8 @@ class Level:
         self.enemy_sprite = pygame.sprite.Group()  # Group for enemy tiles
         self.enemies = pygame.sprite.Group()  # Group for actual enemy sprites
         self.enemy_projectiles = pygame.sprite.Group()  # Group for enemy projectiles
+        self.hearts = pygame.sprite.Group()  # Group for heart objects
+        self.player_arrows = pygame.sprite.Group()  # Group for player arrows
         
         # Game stats
         self.enemies_hit = 0
@@ -131,6 +135,10 @@ class Level:
         self.player.on_ground = True  # Ensure player starts on ground
         self.player.vel_y = 0  # Ensure player starts with zero velocity
         
+        # Create bow weapon using attack2_sheet (bow and arrow sprites)
+        bow_frames = self.player.attack2_frames_right  # Use attack2_sheet for bow
+        self.bow = Bow(bow_frames, 0, 0)  # Create bow instance
+        
         # Create enemies
         self.create_enemies()
     
@@ -143,9 +151,13 @@ class Level:
             # Create tiles from map data
             self.map_tiles = self.map_loader.create_tiles_from_map([self.collision_sprite, self.enemy_sprite])
             
+            # Create objects from map data (hearts, etc.)
+            self.map_objects = self.map_loader.create_objects_from_map([self.hearts])
+            
             # Collect interactive tiles
             self.interactive_tiles = [tile for tile in self.map_tiles if hasattr(tile, 'is_interactive') and tile.is_interactive]
             print(f"Created {len(self.map_tiles)} map tiles")
+            print(f"Created {len(self.map_objects)} map objects")
             print(f"Found {len(self.interactive_tiles)} interactive tiles")
         else:
             print("Failed to load map data")
@@ -216,6 +228,39 @@ class Level:
                     
                     # Set attack cooldown to prevent continuous damage
                     enemy.attack_cooldown = enemy.attack_cooldown_time
+    
+    def check_heart_collisions(self):
+        """Check collisions between player and heart objects"""
+        for heart in self.hearts:
+            heart.update(self.player)
+    
+    def check_bow_attacks(self):
+        """Handle bow attacks and arrow shooting"""
+        if (self.player.attacking and 
+            self.player.get_current_weapon() == 'bow'):
+            
+            # Fire arrow at frame 8 (or any frame >= 8 if animation is shorter)
+            if (int(self.player.attack_index) >= 8 and 
+                not getattr(self, 'arrow_fired_this_attack', False)):  # Fire at frame 8 or later, only once per attack
+                
+                # Shoot arrow
+                arrow = self.bow.shoot_arrow(self.player.rect, self.player.facing_right)
+                if arrow:
+                    self.player_arrows.add(arrow)
+                    self.arrow_fired_this_attack = True  # Prevent multiple arrows
+        
+        # Reset flag when attack ends
+        if not self.player.attacking:
+            self.arrow_fired_this_attack = False
+    
+    def check_arrow_collisions(self):
+        """Check collisions between arrows and enemies"""
+        for arrow in self.player_arrows:
+            arrow.update(self.collision_sprite, self.enemies)
+            
+            # Remove dead arrows
+            if not arrow.alive():
+                self.player_arrows.remove(arrow)
     
     def check_attack_collisions(self):
         """Check collisions between player attacks and enemies"""
@@ -428,6 +473,12 @@ class Level:
         self.check_projectile_collisions()
         self.check_attack_collisions()
         self.check_enemy_attack_collisions()
+        self.check_heart_collisions()
+        
+        # Update bow and check bow attacks and arrow collisions
+        self.bow.update(self.player.rect, self.player.facing_right, self.player.attacking)
+        self.check_bow_attacks()
+        self.check_arrow_collisions()
         
         # Check interactions
         self.check_interactions(keys)
@@ -446,6 +497,12 @@ class Level:
                 screen_pos.y > -32 and screen_pos.y < HEIGHT):
                 self.display_surface.blit(tile.image, screen_pos)
         
+        # Draw hearts
+        for heart in self.hearts:
+            if not heart.collected:
+                screen_pos = self.camera.apply(heart)
+                heart.draw(self.display_surface, screen_pos)
+        
         # Draw enemies (only alive ones)
         for enemy in self.enemies:
             if enemy.is_alive:
@@ -461,6 +518,10 @@ class Level:
         # Draw player on top
         screen_pos = self.camera.apply(self.player)
         self.display_surface.blit(self.player.image, screen_pos)
+        
+        # Draw player arrows (after player so they're visible)
+        for arrow in self.player_arrows:
+            arrow.draw(self.display_surface, self.camera)
         
         # Draw UI elements
         self.draw_ui()
@@ -483,8 +544,8 @@ class Level:
         UI_CORNER_RADIUS = 8
         
         # Create semi-transparent background panels
-        panel_bg = pygame.Surface((300, 120), pygame.SRCALPHA)
-        pygame.draw.rect(panel_bg, (0, 0, 0, UI_BG_ALPHA), (0, 0, 300, 120), border_radius=UI_CORNER_RADIUS)
+        panel_bg = pygame.Surface((300, 150), pygame.SRCALPHA)
+        pygame.draw.rect(panel_bg, (0, 0, 0, UI_BG_ALPHA), (0, 0, 300, 150), border_radius=UI_CORNER_RADIUS)
         
         # Left panel (Health, Score, Combo)
         self.display_surface.blit(panel_bg, (UI_PADDING, UI_PADDING))
@@ -565,6 +626,22 @@ class Level:
             
             combo_text = font_small.render(f"COMBO x{self.combo_count}", True, combo_color)
             self.display_surface.blit(combo_text, (left_x + 150, left_y + 50))
+        
+        # Weapon display - positioned below combo to fit within panel
+        weapon_text = font_medium.render("WEAPON", True, (200, 200, 200))
+        self.display_surface.blit(weapon_text, (left_x, left_y + 100))
+        
+        # Weapon type with color coding
+        current_weapon = self.player.get_current_weapon()
+        if current_weapon == 'bow':
+            weapon_name = "Bow & Arrow"
+            weapon_color = (100, 200, 255)  # Blue for ranged weapon
+        else:
+            weapon_name = "Sword"
+            weapon_color = (255, 200, 100)  # Orange for melee weapon
+        
+        weapon_value = font_small.render(weapon_name, True, weapon_color)
+        self.display_surface.blit(weapon_value, (left_x, left_y + 120))
         
         # Right Panel Content
         right_x = WIDTH - 305

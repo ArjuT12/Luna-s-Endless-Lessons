@@ -1,0 +1,30 @@
+{ "frames": {
+   "hearts1.aseprite": {
+    "frame": { "x": 0, "y": 0, "w": 80, "h": 20 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 80, "h": 20 },
+    "sourceSize": { "w": 80, "h": 20 },
+    "duration": 100
+   }
+ },
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.x-dev",
+  "image": "hearts_full.png",
+  "format": "RGBA8888",
+  "size": { "w": 80, "h": 20 },
+  "scale": "1",
+  "frameTags": [
+  ],
+  "layers": [
+   { "name": "Sprite Sheet", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
+   { "name": "Slice 1", "color": "#0000ffff", "keys": [{ "frame": 0, "bounds": {"x": 0, "y": 0, "w": 20, "h": 20 } }] },
+   { "name": "Slice 2", "color": "#0000ffff", "keys": [{ "frame": 0, "bounds": {"x": 20, "y": 0, "w": 20, "h": 20 } }] },
+   { "name": "Slice 3", "color": "#0000ffff", "keys": [{ "frame": 0, "bounds": {"x": 40, "y": 1, "w": 20, "h": 20 } }] },
+   { "name": "Slice 4", "color": "#0000ffff", "keys": [{ "frame": 0, "bounds": {"x": 60, "y": 0, "w": 20, "h": 20 } }] }
+  ]
+ }
+}

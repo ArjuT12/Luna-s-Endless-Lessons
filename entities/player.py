@@ -1,5 +1,5 @@
 import pygame
-from entities.gun import Gun
+from entities.bow import Bow
 from config import *
 
 # player.py
@@ -42,7 +42,7 @@ class Player(pygame.sprite.Sprite):
         attack2_frame_h = attack2_sheet.get_height()
         attack2_frames = [
             pygame.transform.scale(
-                attack2_sheet.subsurface(pygame.Rect(i * attack2_frame_w, 0, attack2_frame_h, attack2_frame_h - CROP_HEIGHT_ATTACK_2)),
+                attack2_sheet.subsurface(pygame.Rect(i * attack2_frame_w, 0, attack2_frame_w, attack2_frame_h - CROP_HEIGHT_ATTACK_2)),
                 (attack2_frame_w * SCALE, (attack2_frame_h - CROP_HEIGHT_ATTACK_2) * SCALE)
             )
             for i in range(9)
@@ -74,6 +74,10 @@ class Player(pygame.sprite.Sprite):
         self.attacking = False
         self.attack_index = 0
         self.weapon_switched = False
+        
+        # Weapon system
+        self.current_weapon = 'sword'  # 'sword', 'bow'
+        self.weapon_switch_cooldown = 0
         
         # Health system
         self.max_health = 100
@@ -133,6 +137,10 @@ class Player(pygame.sprite.Sprite):
         dx = 0
         self.walking = False
 
+        # Update weapon switch cooldown
+        if self.weapon_switch_cooldown > 0:
+            self.weapon_switch_cooldown -= 1
+
         # Only allow movement, direction changes, and jumping if not attacking
         if not self.attacking:
             if keys[pygame.K_RIGHT]:
@@ -148,6 +156,18 @@ class Player(pygame.sprite.Sprite):
                 self.vel_y = -JUMP_STRENGTH
                 self.on_ground = False
 
+            # Weapon switching (E key)
+            if keys[pygame.K_e] and self.weapon_switch_cooldown <= 0:
+                if self.current_weapon == 'sword':
+                    self.current_weapon = 'bow'
+                    self.current_attack_frames_right = self.attack2_frames_right
+                    self.current_attack_frames_left = self.attack2_frames_left
+                else:
+                    self.current_weapon = 'sword'
+                    self.current_attack_frames_right = self.attack1_frames_right
+                    self.current_attack_frames_left = self.attack1_frames_left
+                self.weapon_switch_cooldown = 30
+
             if keys[pygame.K_f]:
                 self.attacking = True
                 self.attack_index = 0
@@ -157,15 +177,23 @@ class Player(pygame.sprite.Sprite):
         current_bottom = self.rect.bottom
 
         if self.attacking:
-            self.attack_index += 0.2
-            if self.attack_index >= len(self.current_attack_frames_right):
-                self.attacking = False
-                self.attack_index = 0
-
-            current_frame = self.current_attack_frames_right[int(self.attack_index)] if self.facing_right else self.current_attack_frames_left[int(self.attack_index)]
-            
-            # Check for attack collisions with enemies
-            self.check_attack_collision(enemy_sprites)
+            # Different attack speeds for different weapons
+            if self.current_weapon == 'sword':
+                self.attack_index += 0.2
+                if self.attack_index >= len(self.current_attack_frames_right):
+                    self.attacking = False
+                    self.attack_index = 0
+                current_frame = self.current_attack_frames_right[int(self.attack_index)] if self.facing_right else self.current_attack_frames_left[int(self.attack_index)]
+                
+                # Check for sword attack collisions with enemies
+                self.check_attack_collision(enemy_sprites)
+            else:
+                # For ranged weapons, use full animation
+                self.attack_index += 0.2
+                if self.attack_index >= len(self.current_attack_frames_right):
+                    self.attacking = False
+                    self.attack_index = 0
+                current_frame = self.current_attack_frames_right[int(self.attack_index)] if self.facing_right else self.current_attack_frames_left[int(self.attack_index)]
 
         elif self.walking and self.on_ground:
             self.index += 0.2
@@ -275,3 +303,15 @@ class Player(pygame.sprite.Sprite):
             font = pygame.font.Font(None, 24)
             health_text = font.render(f"Health: {self.health}/{self.max_health}", True, (255, 255, 255))
             screen.blit(health_text, (bar_x, bar_y + 25))
+    
+    def get_current_weapon(self):
+        """Get the current weapon type"""
+        return self.current_weapon
+    
+    def is_ranged_weapon(self):
+        """Check if current weapon is ranged"""
+        return self.current_weapon == 'bow'
+    
+    def can_attack(self):
+        """Check if player can attack (not already attacking)"""
+        return not self.attacking

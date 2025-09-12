@@ -24,11 +24,17 @@ class SlimeEnemy(BaseEnemy):
         
         # Attack properties
         self.attack_range = 60  # Increased range for melee attack
-        self.attack_damage = 20  # Increased damage for melee
+        self.attack_damage = 2  # Reduced damage for melee
         self.attack_cooldown_time = 90  # Faster attack cooldown
         self.is_attacking = False
         self.attack_duration = 30  # Duration of attack animation
         self.attack_timer = 0  # Timer for attack duration
+        
+        # Hit limiting system - max 5 hits in 30 seconds
+        self.hit_count = 0  # Number of hits in current time window
+        self.hit_window_start = 0  # When current hit window started
+        self.max_hits_per_window = 5  # Maximum hits allowed
+        self.hit_window_duration = 1800  # 30 seconds at 60fps (30 * 60)
         
         # Animation timing
         self.attack_animation_duration = 6  # frames for attack animation
@@ -71,10 +77,16 @@ class SlimeEnemy(BaseEnemy):
     
     def attack_player(self, player):
         """Slime melee attack - jump towards player"""
-        if self.attack_cooldown <= 0 and not self.is_attacking:
+        if self.attack_cooldown <= 0 and not self.is_attacking and self.can_attack(player):
             # Set attack cooldown
             self.attack_cooldown = self.attack_cooldown_time
             self.attack_timer = 0
+            
+            # Increment hit counter
+            self.hit_count += 1
+            if self.hit_count == 1:
+                # Start new hit window
+                self.hit_window_start = pygame.time.get_ticks() // 16
             
             # Face the player
             if player.rect.centerx < self.rect.centerx:
@@ -84,8 +96,23 @@ class SlimeEnemy(BaseEnemy):
     
     def can_attack(self, player):
         """Check if slime can attack"""
-        # Simple check - can attack if not on cooldown
-        return self.attack_cooldown <= 0
+        # Check basic cooldown
+        if self.attack_cooldown > 0:
+            return False
+        
+        # Check hit limiting system
+        current_time = pygame.time.get_ticks() // 16  # Convert to frame count (60fps)
+        
+        # Reset hit window if 30 seconds have passed
+        if current_time - self.hit_window_start >= self.hit_window_duration:
+            self.hit_count = 0
+            self.hit_window_start = current_time
+        
+        # Can't attack if hit limit reached
+        if self.hit_count >= self.max_hits_per_window:
+            return False
+        
+        return True
     
     def check_height_and_climb(self, level):
         """Check for height differences and climb if needed"""
