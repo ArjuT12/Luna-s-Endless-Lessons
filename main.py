@@ -6,6 +6,7 @@ from entities.player import Player
 from levels.level import Level
 from levels.background import LayeredBackground
 from start_screen import StartScreen
+from api_client import LunaAPIClient
 
 # Initialize Pygame
 pygame.init()
@@ -17,6 +18,15 @@ clock = pygame.time.Clock()
 pygame.font.init()
 font = pygame.font.Font(None, 36)
 
+
+def create_background_for_map(map_name):
+    """Create appropriate background for the given map"""
+    if map_name == "forest2":
+        # Use Futuristic City Parallax for forest2
+        return LayeredBackground(background_folder="Futuristic City Parallax")
+    else:
+        # Use parallax background for other maps
+        return LayeredBackground()
 
 def run_start_screen():
     """Run the start screen and return whether to start the game"""
@@ -36,8 +46,8 @@ def run_game():
     level = Level()
     collision_sprites = level.get_collision_sprites()
     
-    # Create layered background (dark theme)
-    background = LayeredBackground()
+    # Create background based on current map
+    background = create_background_for_map(level.current_map)
 
     # Main game loop
     while True:
@@ -55,7 +65,21 @@ def run_game():
                         # Restart game
                         level = Level()
                         collision_sprites = level.get_collision_sprites()
-                        background = LayeredBackground()
+                        background = create_background_for_map(level.current_map)
+                        continue
+                    elif event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit()
+                continue
+            
+            # Handle win screen
+            if level.game_won:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_r:
+                        # Restart game
+                        level = Level()
+                        collision_sprites = level.get_collision_sprites()
+                        background = create_background_for_map(level.current_map)
                         continue
                     elif event.key == pygame.K_ESCAPE:
                         pygame.quit()
@@ -77,6 +101,14 @@ def run_game():
 
         keys = pygame.key.get_pressed()
 
+        # Check if map has changed and update background accordingly
+        if hasattr(level, 'current_map') and hasattr(level, '_last_map'):
+            if level.current_map != level._last_map:
+                background = create_background_for_map(level.current_map)
+                level._last_map = level.current_map
+        elif hasattr(level, 'current_map'):
+            level._last_map = level.current_map
+
         # Get camera offset for parallax scrolling
         camera_offset = level.camera.camera.topleft
         
@@ -93,15 +125,31 @@ def run_game():
         level.run(keys, collision_sprites)
 
         # INVENTORY DISPLAY (UI elements stay in fixed screen position)
-        weapon_text = "Weapon: Sword" if not level.player.weapon_switched else "Weapon: Bow and Arrow"
-        text_surface = font.render(weapon_text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, 90))  # Moved down to make room for stats
 
         pygame.display.flip()
 
 # Main execution
 if __name__ == "__main__":
+    # Initialize API client for auto-sync
+    api_client = LunaAPIClient()
+    
+    # Auto-sync player data on game startup
+    print("🔄 Auto-syncing player data on startup...")
+    sync_result = api_client.auto_sync_player_data()
+    if sync_result["success"]:
+        print(f"✅ {sync_result['message']}")
+    else:
+        print(f"❌ {sync_result['message']}: {sync_result.get('error', 'Unknown error')}")
+    
     # Run start screen first
     if run_start_screen():
+        # Auto-sync again after start screen (in case data was updated)
+        print("🔄 Auto-syncing player data after start screen...")
+        sync_result = api_client.auto_sync_player_data()
+        if sync_result["success"]:
+            print(f"✅ {sync_result['message']}")
+        else:
+            print(f"❌ {sync_result['message']}: {sync_result.get('error', 'Unknown error')}")
+        
         # If user chose to start game, run the main game
         run_game()

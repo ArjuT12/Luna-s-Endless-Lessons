@@ -239,7 +239,7 @@ class Player(pygame.sprite.Sprite):
             elif keys[pygame.K_i] and not self.can_use_hearts:
                 print("Inventory not yet unlocked! Die to progress the story...")
             
-            # Select items with number keys (1-0) - only when not in navigation mode and hearts unlocked
+            # Select items with number keys (1-5) - only when not in navigation mode and hearts unlocked
             if not self.inventory.is_open and self.can_use_hearts:
                 if keys[pygame.K_1] and self.inventory_toggle_cooldown <= 0:
                     self.inventory.highlight_slot(0)
@@ -260,26 +260,6 @@ class Player(pygame.sprite.Sprite):
                 elif keys[pygame.K_5] and self.inventory_toggle_cooldown <= 0:
                     self.inventory.highlight_slot(4)
                     print("Highlighted slot 5")
-                    self.inventory_toggle_cooldown = 5
-                elif keys[pygame.K_6] and self.inventory_toggle_cooldown <= 0:
-                    self.inventory.highlight_slot(5)
-                    print("Highlighted slot 6")
-                    self.inventory_toggle_cooldown = 5
-                elif keys[pygame.K_7] and self.inventory_toggle_cooldown <= 0:
-                    self.inventory.highlight_slot(6)
-                    print("Highlighted slot 7")
-                    self.inventory_toggle_cooldown = 5
-                elif keys[pygame.K_8] and self.inventory_toggle_cooldown <= 0:
-                    self.inventory.highlight_slot(7)
-                    print("Highlighted slot 8")
-                    self.inventory_toggle_cooldown = 5
-                elif keys[pygame.K_9] and self.inventory_toggle_cooldown <= 0:
-                    self.inventory.highlight_slot(8)
-                    print("Highlighted slot 9")
-                    self.inventory_toggle_cooldown = 5
-                elif keys[pygame.K_0] and self.inventory_toggle_cooldown <= 0:
-                    self.inventory.highlight_slot(9)
-                    print("Highlighted slot 0")
                     self.inventory_toggle_cooldown = 5
             
         # Inventory navigation when open (works even when movement is disabled)

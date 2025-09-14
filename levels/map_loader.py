@@ -10,6 +10,7 @@ class MapLoader:
         self.tile_images = {}
         self.tileset_data = None
         self.tilesets = []  # Store multiple tilesets
+        self.current_map_path = None  # Track current map path
         self.map_data = None
         
     def load_tileset(self, tileset_path):
@@ -31,6 +32,7 @@ class MapLoader:
         try:
             with open(map_path, 'r') as f:
                 self.map_data = json.load(f)
+            self.current_map_path = map_path  # Store current map path
             print(f"Loaded map: {map_path}")
             print(f"Map size: {self.map_data.get('width', 0)}x{self.map_data.get('height', 0)}")
             print(f"Infinite: {self.map_data.get('infinite', False)}")
@@ -169,7 +171,7 @@ class MapLoader:
         solid_tiles = first_tileset_solid | night_tileset_solid
         
         # Define which tile IDs are platform tiles (one-way collision)
-        platform_tiles = {12}  # Tile 12 is a platform tile
+        platform_tiles = {12, 34,35}  # Tile 12 and 34 are platform tiles
         
         # Define which tile IDs are enemy tiles
         # First tileset enemies
@@ -243,6 +245,10 @@ class MapLoader:
         
         objects = []
         
+        # Extract group references
+        hearts_group = groups[0]
+        animated_objects_group = groups[1]
+        
         # Process each layer
         for layer in self.map_data.get('layers', []):
             if layer.get('type') == 'objectgroup':
@@ -261,12 +267,53 @@ class MapLoader:
                     
                     print(f"Object: {obj_name} (type: {obj_type}, gid: {obj_gid}) at ({obj_x}, {obj_y})")
                     
-                    # Create heart objects for Health layer
-                    if layer_name.lower() == 'health' or obj_type.lower() == 'heart' or obj_gid == 117:
+                    # Create animated objects for gid 63 (night map) and gid 118 (forest map) - programmerArt_1 objects
+                    # Only create objects for the currently loaded map
+                    if (obj_gid == 63 and self.current_map_path and 'night_time_map.json' in self.current_map_path) or \
+                       (obj_gid == 118 and self.current_map_path and 'forest2.json' in self.current_map_path):
+                        from entities.animated_object import AnimatedObject
+                        
+                        # Handle positioning internally based on map type
+                        if self.current_map_path and 'night_time_map.json' in self.current_map_path:
+                            # For night map, adjust position
+                            spawn_y = obj_y + 8  # Move up 8 pixels from original position
+                            spawn_x = obj_x       # Keep same X position
+                            print(f"Night map: Moved programmerArt_1 from ({obj_x}, {obj_y}) to ({spawn_x}, {spawn_y})")
+                        elif self.current_map_path and 'forest2.json' in self.current_map_path:
+                            # For forest map, adjust position
+                            spawn_y = obj_y + 8  # Move up 8 pixels from original position
+                            spawn_x = obj_x       # Keep same X position
+                            print(f"Forest map: Moved programmerArt_1 from ({obj_x}, {obj_y}) to ({spawn_x}, {spawn_y})")
+                        
+                        # Create animated object with programmerArt_1 animation
+                        # Only add to the animated_objects group
+                        try:
+                            animated_obj = AnimatedObject(
+                                spawn_x, spawn_y, [animated_objects_group],
+                                'programmerArt_1-sheet.png',
+                                'programmerArt_1.json',
+                                movement_range=130,  # 80 + 50 = 130px region
+                                scale=5.0
+                            )
+                            
+                            # Set visibility to true for all maps
+                            animated_obj.visible = True
+                            objects.append(animated_obj)
+                            print(f"Created animated object at ({spawn_x}, {spawn_y}) with 130px movement range - Visible: {animated_obj.visible}")
+                            print(f"Object image size: {animated_obj.image.get_size() if animated_obj.image else 'None'}")
+                            print(f"Object rect: {animated_obj.rect}")
+                        except Exception as e:
+                            print(f"Error creating animated object: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        continue  # Skip the heart creation logic below
+                    
+                    # Create heart objects for Health layer (gid 117 for forest map, gid 62 for night map)
+                    if layer_name.lower() == 'health' and (obj_gid == 117 or obj_gid == 62):
                         from entities.heart import Heart
                         # Adjust Y position to place heart 20 pixels above the floor
                         heart_y = obj_y - 20
-                        heart = Heart(obj_x, heart_y, groups)
+                        heart = Heart(obj_x, heart_y, [hearts_group])  # Only add to hearts group
                         objects.append(heart)
                         print(f"Created heart object at ({obj_x}, {heart_y}) (adjusted from {obj_y})")
         

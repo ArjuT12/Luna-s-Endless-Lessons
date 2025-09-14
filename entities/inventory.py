@@ -23,33 +23,49 @@ def load_heart_image():
     return HEART_IMAGE
 
 class Inventory:
-    def __init__(self, max_size=10):
+    def __init__(self, max_size=5):  # Half the inventory size
         self.max_size = max_size
         self.items = []
         self.selected_slot = 0
         self.is_open = False  # For keyboard navigation mode
         self.highlighted_slot = -1  # For number key highlighting (-1 = no highlight)
         self.highlight_timer = 0  # Timer for number key highlight
+        self.stack_max = 10  # Maximum items per stack
         
     def add_item(self, item_type, quantity=1):
-        """Add an item to the inventory"""
-        # Check if item already exists in inventory
-        for item in self.items:
-            if item['type'] == item_type:
-                # No stack size limit for hearts, allow unlimited stacking
-                item['quantity'] += quantity
-                return True
+        """Add an item to the inventory with stack limits and overflow"""
+        remaining_quantity = quantity
         
-        # If inventory is full, can't add new item
-        if len(self.items) >= self.max_size:
-            print(f"Inventory is full! Cannot collect {item_type}.")
-            return False
+        # First, try to add to existing stacks of the same item type
+        for item in self.items:
+            if item['type'] == item_type and item['quantity'] < self.stack_max:
+                # This stack can accept more items
+                space_available = self.stack_max - item['quantity']
+                items_to_add = min(remaining_quantity, space_available)
+                
+                item['quantity'] += items_to_add
+                remaining_quantity -= items_to_add
+                
+                if remaining_quantity <= 0:
+                    return True  # All items added successfully
+        
+        # If there's still quantity remaining, try to create new stacks
+        while remaining_quantity > 0:
+            # Check if inventory has space for a new stack
+            if len(self.items) >= self.max_size:
+                print(f"Inventory is full! Cannot collect {remaining_quantity} more {item_type}.")
+                return False
             
-        # Add new item with full quantity
-        self.items.append({
-            'type': item_type,
-            'quantity': quantity
-        })
+            # Create a new stack with up to stack_max items
+            items_for_new_stack = min(remaining_quantity, self.stack_max)
+            
+            self.items.append({
+                'type': item_type,
+                'quantity': items_for_new_stack
+            })
+            
+            remaining_quantity -= items_for_new_stack
+        
         return True
     
     def remove_item(self, item_type, quantity=1):
@@ -92,7 +108,7 @@ class Inventory:
         self.selected_slot = (self.selected_slot - 1) % self.max_size
     
     def select_slot(self, slot_number):
-        """Select a specific slot (0-9)"""
+        """Select a specific slot (0-4)"""
         if 0 <= slot_number < self.max_size:
             self.selected_slot = slot_number
     
@@ -124,11 +140,11 @@ class Inventory:
         if y is None:
             y = screen.get_height() - 80
         
-        # Inventory background - wider for 10 slots
-        inventory_width = 400
+        # Inventory background - smaller for 5 slots
+        inventory_width = 200
         inventory_height = 60
         slot_size = 35
-        slots_per_row = 10
+        slots_per_row = 5
         
         # Draw inventory background
         pygame.draw.rect(screen, (50, 50, 50), (x, y, inventory_width, inventory_height))
@@ -150,9 +166,9 @@ class Inventory:
             pygame.draw.rect(screen, color, (slot_x, slot_y, slot_size, slot_size))
             pygame.draw.rect(screen, (150, 150, 150), (slot_x, slot_y, slot_size, slot_size), 1)
             
-            # Draw slot number (1-0 for keys 1-0)
+            # Draw slot number (1-5 for keys 1-5)
             font = pygame.font.Font(None, 16)
-            slot_number = (i + 1) % 10  # 1-9, then 0
+            slot_number = i + 1  # 1-5 for 5 slots
             number_text = font.render(str(slot_number), True, (255, 255, 255))
             screen.blit(number_text, (slot_x + 2, slot_y + 2))
             
@@ -194,7 +210,7 @@ class Inventory:
         else:
             instructions = [
                 "Press I for navigation mode",
-                "Press 1-0 to select items, W to use"
+                "Press 1-5 to select items, W to use"
             ]
         
         for i, instruction in enumerate(instructions):

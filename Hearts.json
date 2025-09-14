@@ -1,25 +1,30 @@
-{
-   "columns": 0,
-   "grid": {
-      "height": 1,
-      "orientation": "orthogonal",
-      "width": 1
-   },
-   "margin": 0,
-   "name": "Hearts",
-   "spacing": 0,
-   "tilecount": 1,
-   "tiledversion": "1.11.2",
-   "tileheight": 20,
-   "tiles": [
-      {
-         "id": 1,
-         "image": "hearts1.png",
-         "imageheight": 20,
-         "imagewidth": 20
-      }
-   ],
-   "tilewidth": 20,
-   "type": "tileset",
-   "version": "1.10"
+{ "columns":0,
+ "grid":
+    {
+     "height":1,
+     "orientation":"orthogonal",
+     "width":1
+    },
+ "margin":0,
+ "name":"Hearts",
+ "spacing":0,
+ "tilecount":2,
+ "tiledversion":"1.11.2",
+ "tileheight":20,
+ "tiles":[
+        {
+         "id":1,
+         "image":"hearts1.png",
+         "imageheight":20,
+         "imagewidth":20
+        }, 
+        {
+         "id":2,
+         "image":"programmerArt_1.png",
+         "imageheight":16,
+         "imagewidth":16
+        }],
+ "tilewidth":20,
+ "type":"tileset",
+ "version":"1.10"
 }

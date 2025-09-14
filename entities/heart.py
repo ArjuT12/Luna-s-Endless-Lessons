@@ -20,8 +20,8 @@ class Heart(pygame.sprite.Sprite):
         # Set position and rect
         self.rect = pygame.Rect(x, y, 20, 20)  # Each heart slice is 20x20
         
-        # Create a smaller collision area for more precise collection
-        self.collision_rect = pygame.Rect(x + 6, y + 6, 8, 8)  # Smaller collision area in center
+        # Create a much smaller collision area for precise collection
+        self.collision_rect = pygame.Rect(x + 8, y + 8, 4, 4)  # Very small collision area in center
         
         # Animation state
         self.current_frame = 0
@@ -87,8 +87,11 @@ class Heart(pygame.sprite.Sprite):
         self.collision_rect.centerx = self.rect.centerx
         self.collision_rect.centery = self.rect.centery
         
-        # Check if player collected the heart using smaller collision area
-        if self.collision_rect.colliderect(player.rect):
+        # Check if player collected the heart using precise collision detection
+        # Player must be standing on top of the heart (more precise)
+        if (hasattr(player, 'collision_rect') and 
+            self.collision_rect.colliderect(player.collision_rect) and
+            player.rect.bottom <= self.rect.bottom + 5):  # Player must be on top
             self.collect(player)
     
     def collect(self, player):
@@ -122,3 +125,10 @@ class Heart(pygame.sprite.Sprite):
         """Draw the heart with camera offset"""
         if not self.collected:
             surface.blit(self.image, camera_offset)
+            
+            # Debug: Draw collision area (uncomment for testing)
+            # pygame.draw.rect(surface, (255, 0, 0), 
+            #                 (self.collision_rect.x - camera_offset[0], 
+            #                  self.collision_rect.y - camera_offset[1], 
+            #                  self.collision_rect.width, 
+            #                  self.collision_rect.height), 1)

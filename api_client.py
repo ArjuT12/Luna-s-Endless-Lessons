@@ -517,6 +517,41 @@ class LunaAPIClient:
         """Clear all cached data"""
         self._player_data_cache = None
         self._cache_timestamp = 0
+    
+    def auto_sync_player_data(self) -> Dict:
+        """
+        Automatically sync player data to database
+        This function will always sync the current player data from settings to database
+        
+        Returns:
+            Dictionary with sync status and result
+        """
+        try:
+            # Get current player data from settings
+            current_player_data = self.game_settings.get_player_data()
+            current_game_settings = self.game_settings.settings_data.get('game_settings', {})
+            
+            # Always sync the current data
+            result = self.create_or_update_player(current_player_data, current_game_settings)
+            
+            # Update last played timestamp
+            self.update_player_last_played()
+            
+            logger.info("✅ Auto-sync completed successfully")
+            return {
+                "success": True,
+                "message": "Player data synced successfully",
+                "player_data": result.get('player', {}),
+                "synced_at": result.get('updated_at', 'unknown')
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Auto-sync failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Failed to sync player data"
+            }
 
 class APIError(Exception):
     """Custom exception for API errors"""

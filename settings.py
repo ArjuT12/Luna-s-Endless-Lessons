@@ -33,17 +33,19 @@ class GameSettings:
             return "game_settings.json"
     
     def generate_system_id(self) -> str:
-        """Generate a unique system ID based on system information"""
+        """Generate a unique system ID based on system information and timestamp"""
+        import time
         # Get system information
         system_info = {
             'platform': platform.system(),
             'processor': platform.processor(),
             'machine': platform.machine(),
-            'node': platform.node()
+            'node': platform.node(),
+            'timestamp': str(int(time.time()))
         }
         
-        # Create a hash from system information
-        system_string = f"{system_info['platform']}-{system_info['processor']}-{system_info['machine']}-{system_info['node']}"
+        # Create a hash from system information including timestamp
+        system_string = f"{system_info['platform']}-{system_info['processor']}-{system_info['machine']}-{system_info['node']}-{system_info['timestamp']}"
         system_id = hashlib.md5(system_string.encode()).hexdigest()[:16]
         
         return system_id

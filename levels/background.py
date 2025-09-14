@@ -92,16 +92,22 @@ class BackgroundLayer:
 class LayeredBackground:
     """Manages multiple background layers with different parallax effects"""
     
-    def __init__(self, background_folder="Background layers"):
+    def __init__(self, background_folder="Background layers", simple_background=False, background_color=(135, 206, 235)):
         """
         Initialize the layered background system
         
         Args:
             background_folder: Path to folder containing background layer images
+            simple_background: If True, use simple colored background instead of parallax layers
+            background_color: RGB color tuple for simple background (default: sky blue)
         """
         self.layers = []
         self.background_folder = background_folder
-        self.load_background_layers()
+        self.simple_background = simple_background
+        self.background_color = background_color
+        
+        if not simple_background:
+            self.load_background_layers()
     
     def load_background_layers(self):
         """Load all background layer images from the specified folder"""
@@ -115,6 +121,14 @@ class LayeredBackground:
         # Get all PNG files in the background folder
         image_files = [f for f in os.listdir(self.background_folder) if f.endswith('.png')]
         
+        # Check if this is the Futuristic City Parallax folder
+        if "Futuristic City Parallax" in self.background_folder:
+            self.load_futuristic_city_layers(image_files)
+        else:
+            self.load_standard_layers(image_files)
+    
+    def load_standard_layers(self, image_files):
+        """Load standard background layers (original system)"""
         # Sort by the layer number in the filename
         # We want Layer_0010_1 first (farthest), then Layer_0009_2, etc.
         def extract_layer_number(filename):
@@ -185,17 +199,55 @@ class LayeredBackground:
         
         print(f"🎨 Background system ready with {len(self.layers)} layers!")
     
+    def load_futuristic_city_layers(self, image_files):
+        """Load Futuristic City Parallax layers with appropriate ordering and properties"""
+        print(f"🏙️ Loading Futuristic City Parallax layers...")
+        
+        # Define the order and properties for futuristic city layers
+        # Order from back to front (distant to close)
+        futuristic_layers = [
+            ("background.png", 0.1, 0, 1.0, "City Background"),
+            ("city4plan.png", 0.2, 50, 0.9, "Far City Buildings"),
+            ("city3plan.png", 0.3, 100, 0.85, "Mid-Far City Buildings"),
+            ("city2plan.png", 0.4, 150, 0.8, "Mid City Buildings"),
+            ("city1plan.png", 0.5, 200, 0.75, "Close City Buildings"),
+            ("smog2.png", 0.6, 250, 0.7, "Far Smog"),
+            ("smog1.png", 0.7, 300, 0.65, "Close Smog"),
+            ("light.png", 0.8, 350, 0.6, "City Lights"),
+            ("sun.png", 0.9, 400, 0.55, "Sun")
+        ]
+        
+        # Load each layer in the correct order
+        for image_file, parallax_factor, y_offset, scale_factor, description in futuristic_layers:
+            if image_file in image_files:
+                image_path = os.path.join(self.background_folder, image_file)
+                
+                try:
+                    layer = BackgroundLayer(image_path, parallax_factor, y_offset, scale_factor)
+                    self.layers.append(layer)
+                    print(f"✓ Loaded: {image_file} ({description}) - Parallax: {parallax_factor}, Scale: {scale_factor}")
+                except pygame.error as e:
+                    print(f"✗ Error loading {image_file}: {e}")
+            else:
+                print(f"⚠ Missing: {image_file} ({description})")
+        
+        print(f"🏙️ Futuristic City background ready with {len(self.layers)} layers!")
+    
     def draw(self, screen, camera_offset):
         """
-        Draw all background layers in order (back to front)
+        Draw all background layers in order (back to front) or simple colored background
         
         Args:
             screen: Pygame screen surface
             camera_offset: Camera position (x, y)
         """
-        # Draw layers from back to front (distant to close)
-        for i, layer in enumerate(self.layers):
-            layer.draw(screen, camera_offset)
+        if self.simple_background:
+            # Draw simple colored background
+            screen.fill(self.background_color)
+        else:
+            # Draw layers from back to front (distant to close)
+            for i, layer in enumerate(self.layers):
+                layer.draw(screen, camera_offset)
     
     def get_layer_count(self):
         """Return the number of loaded background layers"""
@@ -206,11 +258,14 @@ class LayeredBackground:
         return (0, 0, 0, 0)  # Transparent - let the background layers show through
     
     def get_background_fill_color(self):
-        """Return a solid RGB color sampled from the farthest background layer.
+        """Return a solid RGB color for screen clearing.
         
         This is used for screen.fill() to clear previous frames without
         showing black behind parallax seams.
         """
+        if self.simple_background:
+            return self.background_color
+        
         if not self.layers:
             return (0, 0, 0)
         

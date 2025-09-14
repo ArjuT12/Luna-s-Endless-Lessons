@@ -86,12 +86,10 @@ class StoryProgression:
                 "Luna, you have fallen... but learned.",
                 "I sense your growing wisdom.",
                 "I grant you the power of healing hearts.",
-                "",
                 "HEART CONTROLS:",
                 "I - Open/Close Inventory",
                 "1-0 - Select Heart Slot",
                 "W - Use Selected Heart",
-                "",
                 "Use them wisely to survive longer.",
                 "Each death brings new understanding..."
             ],
@@ -105,8 +103,6 @@ class StoryProgression:
                 "E - Switch Sword/Bow",
                 "F - Fire Arrow (when bow selected)",
                 "Arrow Keys - Aim Direction",
-                "",
-                "You are becoming a true warrior!"
             ]
         }
         return dialogues.get(story_part, [])

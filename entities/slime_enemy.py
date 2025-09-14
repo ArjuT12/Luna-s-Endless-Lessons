@@ -150,7 +150,7 @@ class SlimeEnemy(BaseEnemy):
                 front_tile_id = layer_data[front_tile_index]
                 
                 # Define solid tiles (same as in map_loader.py)
-                solid_tiles = {1, 2, 3, 11, 12, 13, 21, 22, 23, 31, 61, 62, 63, 64}
+                solid_tiles = {1, 2, 3, 11, 12, 13, 21, 22, 23, 31, 34, 61, 62, 63, 64}
                 
                 if front_tile_id in solid_tiles:
                     # There's a solid tile in front, try to climb up

@@ -4,6 +4,7 @@ import random
 import math
 from typing import Tuple, Optional, List
 from settings import GameSettings
+from api_client import LunaAPIClient
 
 class ConfettiParticle:
     def __init__(self, x: int, y: int, screen_width: int, screen_height: int):
@@ -65,6 +66,7 @@ class StartScreen:
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.settings = GameSettings()
+        self.api_client = LunaAPIClient()
         
         # Colors
         self.BLACK = (0, 0, 0)
@@ -287,11 +289,21 @@ class StartScreen:
             # First-time user buttons
             if self.button_rects['submit'].collidepoint(pos):
                 if self.first_name_input.strip() and self.last_name_input.strip() and self.game_name_input.strip():
+                    # Update local settings
                     self.settings.update_player_data(
                         self.first_name_input.strip(),
                         self.last_name_input.strip(),
                         self.game_name_input.strip()
                     )
+                    
+                    # Sync to database
+                    try:
+                        self.api_client.create_or_update_player()
+                        print("✅ Player data synced to database successfully")
+                    except Exception as e:
+                        print(f"❌ Failed to sync player data to database: {e}")
+                        # Continue anyway - local data is saved
+                    
                     return "setup_complete"
         else:
             # Returning user buttons
@@ -385,11 +397,21 @@ class StartScreen:
                             if (self.first_name_input.strip() and 
                                 self.last_name_input.strip() and 
                                 self.game_name_input.strip()):
+                                # Update local settings
                                 self.settings.update_player_data(
                                     self.first_name_input.strip(),
                                     self.last_name_input.strip(),
                                     self.game_name_input.strip()
                                 )
+                                
+                                # Sync to database
+                                try:
+                                    self.api_client.create_or_update_player()
+                                    print("✅ Player data synced to database successfully")
+                                except Exception as e:
+                                    print(f"❌ Failed to sync player data to database: {e}")
+                                    # Continue anyway - local data is saved
+                                
                                 return "setup_complete"
                         else:
                             return "start_game"

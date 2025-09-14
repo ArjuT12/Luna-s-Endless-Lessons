@@ -43,13 +43,15 @@ class Level:
         self.enemy_projectiles = pygame.sprite.Group()  # Group for enemy projectiles
         self.hearts = pygame.sprite.Group()  # Group for heart objects
         self.player_arrows = pygame.sprite.Group()  # Group for player arrows
+        self.animated_objects = pygame.sprite.Group()  # Group for animated objects
         
         # Game stats
         self.enemies_hit = 0
         self.game_over = False
+        self.game_won = False
         self.max_enemies = 5
         self.enemy_spawn_timer = 0
-        self.enemy_spawn_delay = 300  # Spawn new enemy every 5 seconds (300 frames at 60fps)
+        self.enemy_spawn_delay = 600  # Spawn new enemy every 10 seconds (600 frames at 60fps) - reduced spawn rate
         
         # Score system
         self.score = 0
@@ -230,8 +232,8 @@ class Level:
             # Create tiles from map data
             self.map_tiles = self.map_loader.create_tiles_from_map([self.visible_sprite, self.collision_sprite, self.enemy_sprite])
             
-            # Create objects from map data (hearts, etc.)
-            self.map_objects = self.map_loader.create_objects_from_map([self.hearts])
+            # Create objects from map data (hearts, animated objects, etc.)
+            self.map_objects = self.map_loader.create_objects_from_map([self.hearts, self.animated_objects])
             
             # Collect interactive tiles
             self.interactive_tiles = [tile for tile in self.map_tiles if hasattr(tile, 'is_interactive') and tile.is_interactive]
@@ -255,6 +257,16 @@ class Level:
             if self.player.rect.centerx >= map_width - 100:
                 self.start_map_transition()
     
+    def check_win_condition(self):
+        """Check if player has won by reaching the end of the night map"""
+        if self.current_map == "nighttime" and not self.game_won:
+            # Night map is 100 tiles wide (3200 pixels), win when player reaches near the end
+            if self.player.rect.centerx >= 3000:  # 200 pixels before the end
+                self.game_won = True
+                print("🎉 CONGRATULATIONS! Luna has completed her endless lesson!")
+                print(f"Final Score: {self.score:,}")
+                print("Press R to play again or ESC to exit")
+    
     def start_map_transition(self):
         """Start the transition to the night time forest map"""
         if self.map_transitioning:
@@ -269,6 +281,7 @@ class Level:
         self.enemies.empty()
         self.hearts.empty()
         self.player_arrows.empty()
+        self.animated_objects.empty()  # Clear animated objects from previous map
         
         # Clear all map tiles from sprite groups
         for tile in self.map_tiles:
@@ -459,9 +472,10 @@ class Level:
             self.arrow_fired_this_attack = False
     
     def check_arrow_collisions(self):
-        """Check collisions between arrows and enemies"""
+        """Check collisions between arrows and enemies/animated objects"""
         for arrow in self.player_arrows:
-            arrow.update(self.collision_sprite, self.enemies)
+            # Update arrow with both enemies and animated objects
+            arrow.update(self.collision_sprite, self.enemies, self.animated_objects)
             
             # Remove dead arrows
             if not arrow.alive():
@@ -474,6 +488,9 @@ class Level:
             for enemy in self.enemies:
                 if hasattr(enemy, 'hit_this_attack'):
                     delattr(enemy, 'hit_this_attack')
+            for animated_obj in self.animated_objects:
+                if hasattr(animated_obj, 'hit_this_attack'):
+                    delattr(animated_obj, 'hit_this_attack')
             return
             
         # Create attack hitbox
@@ -520,6 +537,10 @@ class Level:
             
             # Only hit one enemy per attack
             if not hit_an_enemy and attack_hitbox.colliderect(enemy.rect) and enemy.is_alive and not hasattr(enemy, 'hit_this_attack'):
+                # Mark enemy as hit this attack to prevent multiple hits
+                enemy.hit_this_attack = True
+                hit_an_enemy = True
+                
                 # Only count hit if enemy actually dies
                 if enemy.take_damage(1):
                     self.enemies_hit += 1
@@ -527,9 +548,37 @@ class Level:
                     enemy_screen_pos = self.camera.apply(enemy)
                     points_earned = self.add_score(100, "kill", enemy_screen_pos)
                     print(f"Enemy killed! +{points_earned} points (Combo: {self.combo_count}x)")
-                # Mark enemy as hit this attack to prevent multiple hits
-                enemy.hit_this_attack = True
-                hit_an_enemy = True  # Only one enemy can be hit per attack
+                else:
+                    print(f"Enemy hit! Health: {enemy.health}/{enemy.max_health}")
+        
+        # Check collision with animated objects - only one can be hit per attack
+        if not hit_an_enemy:
+            for animated_obj in self.animated_objects:
+                # Only draw debug hitbox for alive animated objects
+                if animated_obj.is_alive:
+                    # Debug: Draw animated object hitbox
+                    obj_screen_pos = self.camera.apply(animated_obj)
+                    obj_debug_rect = pygame.Rect(obj_screen_pos[0], obj_screen_pos[1], animated_obj.rect.width, animated_obj.rect.height)
+                    pygame.draw.rect(self.display_surface, (255, 255, 0), obj_debug_rect, 2)
+                
+                # Only hit one animated object per attack
+                if not hit_an_enemy and attack_hitbox.colliderect(animated_obj.rect) and animated_obj.is_alive and not hasattr(animated_obj, 'hit_this_attack'):
+                    # Mark as hit this attack to prevent multiple hits
+                    animated_obj.hit_this_attack = True
+                    hit_an_enemy = True
+                    
+                    # Deal damage to animated object
+                    if animated_obj.take_damage(1):
+                        self.enemies_hit += 1
+                        # Add score for killing animated object
+                        obj_screen_pos = self.camera.apply(animated_obj)
+                        points_earned = self.add_score(150, "kill", obj_screen_pos)  # Higher score for animated objects
+                        print(f"Animated object killed! +{points_earned} points (Combo: {self.combo_count}x)")
+                    else:
+                        print(f"Animated object hit! Health: {animated_obj.health}/{animated_obj.max_health}")
+                # Mark animated object as hit this attack to prevent multiple hits
+                animated_obj.hit_this_attack = True
+                hit_an_enemy = True  # Only one target can be hit per attack
 
     def check_interactions(self, keys):
         """Check if player is near interactive tiles and handle interactions"""
@@ -631,6 +680,9 @@ class Level:
         self.dialogue_active = False
         self.current_dialogue = None
         self.dialogue_index = 0
+        # Reset key press flags to ensure proper input handling after dialogue
+        self.z_pressed = False
+        self.enter_pressed = False
     
     def start_story_dialogue(self, story_part):
         """Start story dialogue for the given story part"""
@@ -658,10 +710,18 @@ class Level:
         self.current_story_dialogue = None
         self.story_dialogue_index = 0
         self.show_intro_dialogue = False
+        # Reset key press flags to ensure proper input handling after dialogue
+        self.r_pressed = False
+        self.z_pressed = False
+        self.enter_pressed = False
     
     def end_intro_dialogue(self):
         """End intro dialogue"""
         self.show_intro_dialogue = False
+        # Reset key press flags to ensure proper input handling after dialogue
+        self.r_pressed = False
+        self.z_pressed = False
+        self.enter_pressed = False
     
     def draw_ui(self):
         """Draw interaction prompts and dialogue"""
@@ -890,6 +950,19 @@ class Level:
     def run(self, keys, collision_sprites):
         #run whole game(level)
         
+        # Auto-sync player data periodically (every 5 seconds)
+        if not hasattr(self, 'last_sync_time'):
+            self.last_sync_time = 0
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_sync_time > 5000:  # 5 seconds
+            if self.api_connected:
+                sync_result = self.api_client.auto_sync_player_data()
+                if sync_result["success"]:
+                    print("🔄 Auto-sync completed during gameplay")
+                else:
+                    print(f"❌ Auto-sync failed during gameplay: {sync_result.get('error', 'Unknown error')}")
+            self.last_sync_time = current_time
+        
         # Update survival time and UI animations
         self.update_survival_time()
         self.update_ui_animations()
@@ -920,6 +993,10 @@ class Level:
             else:
                 enemy.update(self.player, collision_sprites)
         
+        # Update animated objects
+        for animated_obj in self.animated_objects:
+            animated_obj.update(self.player, self)
+        
         # Spawn enemies if less than max
         self.spawn_enemies_if_needed()
         
@@ -941,6 +1018,9 @@ class Level:
         
         # Check for map transition
         self.check_map_transition()
+        
+        # Check for win condition
+        self.check_win_condition()
         
         # Update map transition
         self.update_map_transition()
@@ -965,6 +1045,16 @@ class Level:
                 if not heart.collected:
                     screen_pos = self.camera.apply(heart)
                     heart.draw(self.display_surface, screen_pos)
+        
+        # Draw animated objects (only if visible)
+        for animated_obj in self.animated_objects:
+            if animated_obj.visible:
+                screen_pos = self.camera.apply(animated_obj)
+                self.display_surface.blit(animated_obj.image, screen_pos)
+                
+                # Draw health bar above animated object
+                if animated_obj.is_alive:
+                    self.draw_animated_object_health_bar(animated_obj, screen_pos)
         
         # Draw enemies (only alive ones)
         for enemy in self.enemies:
@@ -1015,6 +1105,10 @@ class Level:
         # Draw game over screen on top of everything
         if self.game_over:
             self.draw_game_over_screen()
+        
+        # Draw win screen on top of everything
+        if self.game_won:
+            self.draw_win_screen()
         
     def draw_game_stats(self):
         """Draw modern game statistics UI"""
@@ -1136,12 +1230,7 @@ class Level:
         time_value = font_large.render(f"{minutes:02d}:{seconds:02d}", True, (100, 255, 100))
         self.display_surface.blit(time_value, (right_x, right_y + 20))
         
-        # Enemies Alive
-        enemies_text = font_medium.render("ENEMIES", True, (200, 200, 200))
-        self.display_surface.blit(enemies_text, (right_x, right_y + 50))
-        
-        enemies_value = font_large.render(f"{alive_enemies}", True, (255, 150, 150))
-        self.display_surface.blit(enemies_value, (right_x, right_y + 70))
+        # Enemies Alive - REMOVED from UI
         
         # Multiplier (if > 1)
         if self.score_multiplier > 1.0:
@@ -1218,19 +1307,16 @@ class Level:
         time_rect = time_text.get_rect(center=(WIDTH//2, stats_y))
         self.display_surface.blit(time_text, time_rect)
         
-        # Enemies killed
-        enemies_text = font_small.render(f"Enemies Defeated: {score_breakdown['enemies_killed']}", True, (255, 150, 150))
-        enemies_rect = enemies_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing))
-        self.display_surface.blit(enemies_text, enemies_rect)
+        # Enemies killed - REMOVED from end screen
         
         # Max combo
         combo_text = font_small.render(f"Max Combo: {score_breakdown['max_combo']}x", True, (255, 100, 100))
-        combo_rect = combo_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing * 2))
+        combo_rect = combo_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing))
         self.display_surface.blit(combo_text, combo_rect)
         
         # Restart instruction with more space
         restart_text = font_small.render("Press R for Luna to try again or ESC to exit", True, (200, 200, 200))
-        restart_rect = restart_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing * 3 + 20))
+        restart_rect = restart_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing * 2 + 20))
         self.display_surface.blit(restart_text, restart_rect)
         
         # Add blinking effect for restart instruction
@@ -1335,6 +1421,74 @@ class Level:
             'multiplier': self.score_multiplier
         }
 
+    def draw_win_screen(self):
+        """Draw win screen when player completes the night map"""
+        # Create semi-transparent overlay
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(120)
+        overlay.fill((0, 0, 0))
+        self.display_surface.blit(overlay, (0, 0))
+        
+        # Draw win text with smaller fonts
+        font_large = pygame.font.Font(None, 80)
+        font_medium = pygame.font.Font(None, 48)
+        font_small = pygame.font.Font(None, 36)
+        
+        # Main win text with outline
+        win_text = font_large.render("VICTORY!", True, (255, 215, 0))
+        win_rect = win_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 120))
+        
+        # Draw outline
+        outline_color = (0, 0, 0)
+        for dx in [-2, 0, 2]:
+            for dy in [-2, 0, 2]:
+                if dx != 0 or dy != 0:
+                    outline_rect = win_text.get_rect(center=(WIDTH//2 + dx, HEIGHT//2 - 120 + dy))
+                    outline_surface = font_large.render("VICTORY!", True, outline_color)
+                    self.display_surface.blit(outline_surface, outline_rect)
+        
+        self.display_surface.blit(win_text, win_rect)
+        
+        # Congratulations text
+        congrats_text = font_medium.render("Luna has completed her endless lesson!", True, (255, 255, 255))
+        congrats_rect = congrats_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 60))
+        self.display_surface.blit(congrats_text, congrats_rect)
+        
+        # Score breakdown
+        score_breakdown = self.get_score_breakdown()
+        
+        # Final Score
+        final_score_text = font_medium.render(f"FINAL SCORE: {self.score:,}", True, (255, 215, 0))
+        final_score_rect = final_score_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 10))
+        self.display_surface.blit(final_score_text, final_score_rect)
+        
+        # Stats grid
+        stats_y = HEIGHT//2 + 40
+        stats_spacing = 40
+        
+        # Time survived
+        time_text = font_small.render(f"Time Survived: {score_breakdown['survival_time']}s", True, (100, 255, 100))
+        time_rect = time_text.get_rect(center=(WIDTH//2, stats_y))
+        self.display_surface.blit(time_text, time_rect)
+        
+        # Enemies killed - REMOVED from end screen
+        
+        # Max combo
+        combo_text = font_small.render(f"Max Combo: {score_breakdown['max_combo']}x", True, (255, 100, 100))
+        combo_rect = combo_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing))
+        self.display_surface.blit(combo_text, combo_rect)
+        
+        # Restart instruction
+        restart_text = font_small.render("Press R to play again or ESC to exit", True, (200, 200, 200))
+        restart_rect = restart_text.get_rect(center=(WIDTH//2, stats_y + stats_spacing * 2 + 20))
+        self.display_surface.blit(restart_text, restart_rect)
+        
+        # Add blinking effect for restart instruction
+        import time
+        if int(time.time() * 2) % 2:  # Blink every 0.5 seconds
+            restart_text = font_small.render("Press R to play again or ESC to exit", True, (255, 255, 255))
+            self.display_surface.blit(restart_text, restart_rect)
+
     def spawn_enemies_if_needed(self):
         """Spawn enemies based on time and maintain minimum count"""
         # Increment spawn timer
@@ -1349,7 +1503,7 @@ class Level:
         
         # Spawn new enemy if timer is up OR if we have fewer than minimum enemies
         # But never exceed 5 alive enemies at any time
-        should_spawn = ((self.enemy_spawn_timer >= self.enemy_spawn_delay) or (alive_enemies < 3)) and (alive_enemies < 5)
+        should_spawn = ((self.enemy_spawn_timer >= self.enemy_spawn_delay) or (alive_enemies < 2)) and (alive_enemies < 5)
         
         # Additional safety check: if we somehow have more than 5 alive enemies, don't spawn more
         if alive_enemies >= 5:
@@ -1375,15 +1529,13 @@ class Level:
             valid_position = False
             
             for attempt in range(max_attempts):
-                offset_x = random.randint(-400, 400)
-                spawn_x = self.player.rect.centerx + offset_x
+                # Spawn enemies all over the map instead of just near player
+                # Map width is typically 3200 pixels (100 tiles * 32px), spawn across entire width
+                spawn_x = random.randint(100, 3100)  # Spawn across entire map width
                 
                 # Ground is from 0 to 96 pixels from bottom, so spawn enemies above ground
                 # Spawn enemies at Y position 520
                 spawn_y = 520  # Fixed Y position above ground
-                
-                # Make sure spawn position is within reasonable bounds
-                spawn_x = max(100, min(spawn_x, 2000))
                 
                 # Check if position is NOT on tile ID 13
                 if not self.is_position_on_tile_id(spawn_x, spawn_y, 13):
@@ -1408,6 +1560,32 @@ class Level:
             
             # Reset timer
             self.enemy_spawn_timer = 0
+
+    def draw_animated_object_health_bar(self, animated_obj, screen_pos):
+        """Draw health bar above animated object"""
+        if not hasattr(animated_obj, 'health') or not hasattr(animated_obj, 'max_health'):
+            return
+        
+        # Health bar dimensions
+        bar_width = 60
+        bar_height = 8
+        bar_x = screen_pos[0] + (animated_obj.rect.width - bar_width) // 2
+        bar_y = screen_pos[1] - 15  # 15 pixels above the object
+        
+        # Background (red)
+        background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+        pygame.draw.rect(self.display_surface, (255, 0, 0), background_rect)
+        
+        # Health (green)
+        health_percentage = animated_obj.health / animated_obj.max_health
+        health_width = int(bar_width * health_percentage)
+        if health_width > 0:
+            health_rect = pygame.Rect(bar_x, bar_y, health_width, bar_height)
+            pygame.draw.rect(self.display_surface, (0, 255, 0), health_rect)
+        
+        # Border (white)
+        border_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+        pygame.draw.rect(self.display_surface, (255, 255, 255), border_rect, 1)
 
     def get_collision_sprites(self):
         return self.collision_sprite

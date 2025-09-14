@@ -42,7 +42,7 @@ class Arrow(pygame.sprite.Sprite):
         self.has_hit = False
         
         
-    def update(self, collision_sprites, enemy_sprites):
+    def update(self, collision_sprites, enemy_sprites, animated_objects=None):
         """Update arrow position and check collisions"""
         self.age += 1
         
@@ -69,6 +69,20 @@ class Arrow(pygame.sprite.Sprite):
                 if hasattr(enemy, 'is_alive') and enemy.is_alive and self.rect.colliderect(enemy.rect):
                     # Deal damage to enemy
                     enemy.take_damage(self.damage)
+                    print(f"Arrow hit enemy for {self.damage} damage!")
+                    self.has_hit = True
+                    self.kill()
+                    return
+        
+        # Check collision with animated objects
+        if not self.has_hit and animated_objects:
+            for animated_obj in animated_objects:
+                if hasattr(animated_obj, 'is_alive') and animated_obj.is_alive and self.rect.colliderect(animated_obj.rect):
+                    # Deal damage to animated object
+                    if animated_obj.take_damage(self.damage):
+                        print(f"Arrow killed animated object for {self.damage} damage!")
+                    else:
+                        print(f"Arrow hit animated object for {self.damage} damage! Health: {animated_obj.health}/{animated_obj.max_health}")
                     self.has_hit = True
                     self.kill()
                     return
