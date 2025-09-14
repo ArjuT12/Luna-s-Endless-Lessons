@@ -86,17 +86,7 @@ def run_game():
                         sys.exit()
                 continue
             
-            # Handle weapon switching with keydown events
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_e:
-                    if level.player.weapon_switched:
-                        level.player.current_attack_frames_right = level.player.attack1_frames_right
-                        level.player.current_attack_frames_left = level.player.attack1_frames_left
-                        level.player.weapon_switched = False
-                    else:
-                        level.player.current_attack_frames_right = level.player.attack2_frames_right
-                        level.player.current_attack_frames_left = level.player.attack2_frames_left
-                        level.player.weapon_switched = True
+            # Weapon switching is now handled in player.py with proper unlock checks
                 
 
         keys = pygame.key.get_pressed()

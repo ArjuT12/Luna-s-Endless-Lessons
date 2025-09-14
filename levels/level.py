@@ -517,23 +517,12 @@ class Level:
         attack_hitbox = pygame.Rect(hitbox_x, hitbox_y, hitbox_width, hitbox_height)
         
         # Debug: Draw attack hitbox in screen coordinates (remove this later)
-        attack_screen_rect = pygame.Rect(
-            attack_hitbox.x - self.camera.camera.x,
-            attack_hitbox.y - self.camera.camera.y,
-            attack_hitbox.width,
-            attack_hitbox.height
-        )
-        pygame.draw.rect(self.display_surface, (255, 0, 0), attack_screen_rect, 2)
+        # Attack hitbox debug drawing removed
         
         # Check collision with enemies - only one enemy can be hit per attack
         hit_an_enemy = False
         for enemy in self.enemies:
-            # Only draw debug hitbox for alive enemies
-            if enemy.is_alive:
-                # Debug: Draw enemy hitbox
-                enemy_screen_pos = self.camera.apply(enemy)
-                enemy_debug_rect = pygame.Rect(enemy_screen_pos[0], enemy_screen_pos[1], enemy.rect.width, enemy.rect.height)
-                pygame.draw.rect(self.display_surface, (0, 255, 0), enemy_debug_rect, 2)
+            # Enemy hitbox debug drawing removed
             
             # Only hit one enemy per attack
             if not hit_an_enemy and attack_hitbox.colliderect(enemy.rect) and enemy.is_alive and not hasattr(enemy, 'hit_this_attack'):
@@ -553,16 +542,16 @@ class Level:
         
         # Check collision with animated objects - only one can be hit per attack
         if not hit_an_enemy:
-            for animated_obj in self.animated_objects:
-                # Only draw debug hitbox for alive animated objects
-                if animated_obj.is_alive:
-                    # Debug: Draw animated object hitbox
-                    obj_screen_pos = self.camera.apply(animated_obj)
-                    obj_debug_rect = pygame.Rect(obj_screen_pos[0], obj_screen_pos[1], animated_obj.rect.width, animated_obj.rect.height)
-                    pygame.draw.rect(self.display_surface, (255, 255, 0), obj_debug_rect, 2)
+            print(f"DEBUG: Checking {len(self.animated_objects)} animated objects for collision")
+            for i, animated_obj in enumerate(self.animated_objects):
+                # Animated object hitbox debug drawing removed
+                print(f"DEBUG: Animated object {i}: alive={animated_obj.is_alive}, rect={animated_obj.rect}, hit_this_attack={hasattr(animated_obj, 'hit_this_attack')}")
+                print(f"DEBUG: Attack hitbox: {attack_hitbox}")
+                print(f"DEBUG: Collision check: {attack_hitbox.colliderect(animated_obj.rect)}")
                 
                 # Only hit one animated object per attack
                 if not hit_an_enemy and attack_hitbox.colliderect(animated_obj.rect) and animated_obj.is_alive and not hasattr(animated_obj, 'hit_this_attack'):
+                    print(f"DEBUG: HIT! Animated object {i} hit by attack")
                     # Mark as hit this attack to prevent multiple hits
                     animated_obj.hit_this_attack = True
                     hit_an_enemy = True
@@ -576,9 +565,7 @@ class Level:
                         print(f"Animated object killed! +{points_earned} points (Combo: {self.combo_count}x)")
                     else:
                         print(f"Animated object hit! Health: {animated_obj.health}/{animated_obj.max_health}")
-                # Mark animated object as hit this attack to prevent multiple hits
-                animated_obj.hit_this_attack = True
-                hit_an_enemy = True  # Only one target can be hit per attack
+                    break  # Only hit one target per attack
 
     def check_interactions(self, keys):
         """Check if player is near interactive tiles and handle interactions"""
