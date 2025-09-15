@@ -1603,4 +1603,7 @@ def list_luna_users():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # This will only run when the script is executed directly
+    # In production, gunicorn will import the app and serve it
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

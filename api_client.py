@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class LunaAPIClient:
-    def __init__(self, base_url: str = "http://localhost:5000"):
+    def __init__(self, base_url: str = "https://luna-s-endless-lessons.onrender.com"):
         """
         Initialize the API client
         

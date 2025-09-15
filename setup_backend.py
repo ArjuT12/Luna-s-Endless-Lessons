@@ -64,7 +64,7 @@ def test_backend_connection():
     print("\n🔌 Testing backend connection...")
     try:
         import requests
-        response = requests.get("http://localhost:5000/", timeout=5)
+        response = requests.get("https://luna-s-endless-lessons.onrender.com/", timeout=5)
         if response.status_code == 200:
             print("✅ Backend API is running")
             return True
