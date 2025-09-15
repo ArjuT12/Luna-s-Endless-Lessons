@@ -120,11 +120,11 @@ def run_game():
 
 # Main execution
 if __name__ == "__main__":
-    # Initialize API client for auto-sync
+    # Initialize API client - all API calls happen at start and end only
     api_client = LunaAPIClient()
     
-    # Auto-sync player data on game startup
-    print("🔄 Auto-syncing player data on startup...")
+    # Single API sync at game startup only
+    print("🔄 Initializing game data...")
     sync_result = api_client.auto_sync_player_data()
     if sync_result["success"]:
         print(f"✅ {sync_result['message']}")
@@ -133,13 +133,6 @@ if __name__ == "__main__":
     
     # Run start screen first
     if run_start_screen():
-        # Auto-sync again after start screen (in case data was updated)
-        print("🔄 Auto-syncing player data after start screen...")
-        sync_result = api_client.auto_sync_player_data()
-        if sync_result["success"]:
-            print(f"✅ {sync_result['message']}")
-        else:
-            print(f"❌ {sync_result['message']}: {sync_result.get('error', 'Unknown error')}")
-        
+        # No API calls here - only at start and end
         # If user chose to start game, run the main game
         run_game()

@@ -937,18 +937,7 @@ class Level:
     def run(self, keys, collision_sprites):
         #run whole game(level)
         
-        # Auto-sync player data periodically (every 5 seconds)
-        if not hasattr(self, 'last_sync_time'):
-            self.last_sync_time = 0
-        current_time = pygame.time.get_ticks()
-        if current_time - self.last_sync_time > 5000:  # 5 seconds
-            if self.api_connected:
-                sync_result = self.api_client.auto_sync_player_data()
-                if sync_result["success"]:
-                    print("🔄 Auto-sync completed during gameplay")
-                else:
-                    print(f"❌ Auto-sync failed during gameplay: {sync_result.get('error', 'Unknown error')}")
-            self.last_sync_time = current_time
+        # API calls removed from mid-game - only happen at start and end
         
         # Update survival time and UI animations
         self.update_survival_time()
