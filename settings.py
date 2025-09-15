@@ -15,19 +15,11 @@ class GameSettings:
     def _get_hidden_settings_path(self) -> str:
         """Get a hidden path for the settings file"""
         if getattr(sys, 'frozen', False):
-            # Running as compiled EXE
-            if platform.system() == "Windows":
-                # Windows: Use AppData\Local\Temp or create hidden folder
-                appdata = os.environ.get('APPDATA', tempfile.gettempdir())
-                hidden_dir = os.path.join(appdata, '.LunaGame')
-                os.makedirs(hidden_dir, exist_ok=True)
-                return os.path.join(hidden_dir, 'settings.dat')
-            else:
-                # macOS/Linux: Use hidden directory in home
-                home = os.path.expanduser("~")
-                hidden_dir = os.path.join(home, '.luna_game')
-                os.makedirs(hidden_dir, exist_ok=True)
-                return os.path.join(hidden_dir, 'settings.dat')
+            # Running as compiled EXE - use cross-platform approach
+            home = os.path.expanduser("~")
+            hidden_dir = os.path.join(home, '.luna_game')
+            os.makedirs(hidden_dir, exist_ok=True)
+            return os.path.join(hidden_dir, 'settings.dat')
         else:
             # Running as Python script (development)
             return "game_settings.json"
@@ -35,17 +27,15 @@ class GameSettings:
     def generate_system_id(self) -> str:
         """Generate a unique system ID based on system information and timestamp"""
         import time
-        # Get system information
+        # Get system information (simplified for cross-platform compatibility)
         system_info = {
-            'platform': platform.system(),
-            'processor': platform.processor(),
             'machine': platform.machine(),
             'node': platform.node(),
             'timestamp': str(int(time.time()))
         }
         
         # Create a hash from system information including timestamp
-        system_string = f"{system_info['platform']}-{system_info['processor']}-{system_info['machine']}-{system_info['node']}-{system_info['timestamp']}"
+        system_string = f"{system_info['machine']}-{system_info['node']}-{system_info['timestamp']}"
         system_id = hashlib.md5(system_string.encode()).hexdigest()[:16]
         
         return system_id

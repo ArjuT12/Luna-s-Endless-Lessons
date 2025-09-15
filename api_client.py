@@ -16,17 +16,23 @@ logger = logging.getLogger(__name__)
 class LunaAPIClient:
     def __init__(self, base_url: str = "https://luna-s-endless-lessons.onrender.com"):
         """
-        Initialize the API client
+        Initialize the API client for Render server
         
         Args:
             base_url: Base URL of the backend API
         """
         self.base_url = base_url.rstrip('/')
         self.session = requests.Session()
+        
+        # Optimize for Render server (always running)
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'User-Agent': 'LunaGame/1.0'
+            'User-Agent': 'LunaGame/1.0',
+            'Accept': 'application/json'
         })
+        
+        # Set reasonable timeouts for Render server
+        self.session.timeout = 10  # 10 second timeout for Render
         
         # Game settings for system_id
         self.game_settings = GameSettings()
@@ -56,13 +62,13 @@ class LunaAPIClient:
         
         try:
             if method.upper() == 'GET':
-                response = self.session.get(url, params=params)
+                response = self.session.get(url, params=params, timeout=self.session.timeout)
             elif method.upper() == 'POST':
-                response = self.session.post(url, json=data)
+                response = self.session.post(url, json=data, timeout=self.session.timeout)
             elif method.upper() == 'PUT':
-                response = self.session.put(url, json=data)
+                response = self.session.put(url, json=data, timeout=self.session.timeout)
             elif method.upper() == 'DELETE':
-                response = self.session.delete(url)
+                response = self.session.delete(url, timeout=self.session.timeout)
             else:
                 raise APIError(f"Unsupported HTTP method: {method}")
             
@@ -351,13 +357,13 @@ class LunaAPIClient:
     
     def test_connection(self) -> bool:
         """
-        Test connection to the API
+        Test connection to the Render API server
         
         Returns:
             True if connection successful, False otherwise
         """
         try:
-            response = self.session.get(f"{self.base_url}/")
+            response = self.session.get(f"{self.base_url}/", timeout=self.session.timeout)
             response.raise_for_status()
             return True
         except Exception:
