@@ -12,7 +12,6 @@ class GameSettings:
         self.settings_data = self.load_settings()
     
     def _get_hidden_settings_path(self) -> str:
-        """Get a hidden path for the settings file"""
         if getattr(sys, 'frozen', False):
             home = os.path.expanduser("~")
             hidden_dir = os.path.join(home, '.luna_game')
