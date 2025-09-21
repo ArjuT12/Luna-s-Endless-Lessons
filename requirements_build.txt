@@ -1,0 +1,4 @@
+# Requirements for building Luna's Endless Lesson
+pygame>=2.0.0
+pyinstaller>=5.0.0
+requests>=2.25.0
