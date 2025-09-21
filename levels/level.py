@@ -931,6 +931,19 @@ class Level:
     def run(self, keys, collision_sprites):
         #run whole game(level)
         
+        # Check for heart purchases from API
+        system_id = None
+        if self.api_client:
+            try:
+                system_id = self.api_client.get_system_id()
+            except Exception as e:
+                print(f"Warning: Could not get system_id: {e}")
+        
+        if self.story_progression.check_for_heart_purchases(self.api_client, system_id):
+            # Sync player inventory if hearts were updated
+            if hasattr(self, 'player') and self.player:
+                self.player.sync_inventory_from_story_progress()
+        
         # API calls removed from mid-game - only happen at start and end
         
         # Update survival time and UI animations
