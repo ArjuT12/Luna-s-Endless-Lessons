@@ -12,9 +12,49 @@ from bson import ObjectId
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+def _find_story_progress_file():
+    """Find the writable story progress file, checking multiple locations"""
+    import platform
+    from pathlib import Path
+    
+    # List of possible locations to check
+    possible_paths = []
+    
+    # 1. Development path (relative to backend directory)
+    dev_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'story_progress.json')
+    possible_paths.append(dev_path)
+    
+    # 2. User data directories (if running from build)
+    if platform.system() == "Windows":
+        appdata = os.environ.get('APPDATA', '')
+        user_data_dir = Path(appdata) / "LunasEndlessLesson"
+    elif platform.system() == "Darwin":
+        home = Path.home()
+        user_data_dir = home / "Library" / "Application Support" / "LunasEndlessLesson"
+    else:  # Linux
+        home = Path.home()
+        user_data_dir = home / ".local" / "share" / "LunasEndlessLesson"
+    
+    user_data_path = user_data_dir / "story_progress.json"
+    possible_paths.append(str(user_data_path))
+    
+    # 3. Current working directory
+    possible_paths.append("story_progress.json")
+    
+    # Check each path and return the first one that exists
+    for path in possible_paths:
+        if os.path.exists(path):
+            logger.info(f"Found story progress file at: {path}")
+            return path
+    
+    # If none exist, return the development path (will be created)
+    logger.info(f"No existing story progress file found, will create at: {dev_path}")
+    return dev_path
+
 def update_story_progress(system_id, hearts_purchased):
     try:
-        story_progress_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'story_progress.json')
+        # Try to find the writable story progress file
+        story_progress_path = _find_story_progress_file()
         
         if os.path.exists(story_progress_path):
             with open(story_progress_path, 'r') as f:
@@ -1424,9 +1464,19 @@ def purchase_shop_item():
         )
         luna_db.Orders.insert_one(order_data)
         
-        # Update story progress if heart was purchased
+        # Store heart purchase in database for cloud API
         if item.get("name") == "Heart":
-            update_story_progress(system_id, quantity)
+            # Create a heart purchase record
+            heart_purchase = {
+                "system_id": system_id,
+                "item_id": item_id,
+                "quantity": quantity,
+                "purchase_date": datetime.utcnow().isoformat(),
+                "processed": False,  # Will be set to True when game processes it
+                "created_at": datetime.utcnow().isoformat()
+            }
+            luna_db.HeartPurchases.insert_one(heart_purchase)
+            logger.info(f"Stored heart purchase in database: {quantity} hearts for system_id {system_id}")
         
         return jsonify({
             "message": "Purchase successful",
@@ -1441,6 +1491,52 @@ def purchase_shop_item():
     except Exception as e:
         logger.error(f"Error processing purchase: {str(e)}")
         return jsonify({"error": "Failed to process purchase"}), 500
+
+@app.route("/api/hearts/pending/<system_id>", methods=["GET"])
+def get_pending_hearts(system_id):
+    """Get pending heart purchases for a player"""
+    if luna_db is None:
+        return jsonify({"error": "Database not available"}), 503
+    
+    try:
+        # Get unprocessed heart purchases
+        pending_hearts = list(luna_db.HeartPurchases.find({
+            "system_id": system_id,
+            "processed": False
+        }))
+        
+        # Calculate total hearts to add
+        total_hearts = sum(heart["quantity"] for heart in pending_hearts)
+        
+        return jsonify({
+            "pending_hearts": total_hearts,
+            "purchases": pending_hearts
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error retrieving pending hearts: {str(e)}")
+        return jsonify({"error": "Failed to retrieve pending hearts"}), 500
+
+@app.route("/api/hearts/process/<system_id>", methods=["POST"])
+def process_heart_purchases(system_id):
+    """Mark heart purchases as processed"""
+    if luna_db is None:
+        return jsonify({"error": "Database not available"}), 503
+    
+    try:
+        # Mark all pending heart purchases as processed
+        result = luna_db.HeartPurchases.update_many(
+            {"system_id": system_id, "processed": False},
+            {"$set": {"processed": True, "processed_at": datetime.utcnow().isoformat()}}
+        )
+        
+        return jsonify({
+            "message": f"Marked {result.modified_count} heart purchases as processed"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error processing heart purchases: {str(e)}")
+        return jsonify({"error": "Failed to process heart purchases"}), 500
 
 # Random Data Generation Route
 @app.route("/api/generate-random-data", methods=["POST"])

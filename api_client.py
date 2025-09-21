@@ -390,6 +390,36 @@ class LunaAPIClient:
                 "api_connected": False
             }
     
+    def get_pending_hearts(self, system_id: str) -> Dict:
+        """
+        Get pending heart purchases for a player
+        
+        Returns:
+            Dictionary with pending hearts data
+        """
+        try:
+            response = self.session.get(f"{self.base_url}/api/hearts/pending/{system_id}")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Failed to get pending hearts: {e}")
+            return {"success": False, "error": str(e), "pending_hearts": 0}
+    
+    def process_heart_purchases(self, system_id: str) -> Dict:
+        """
+        Mark heart purchases as processed
+        
+        Returns:
+            Dictionary with processing result
+        """
+        try:
+            response = self.session.post(f"{self.base_url}/api/hearts/process/{system_id}")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Failed to process heart purchases: {e}")
+            return {"success": False, "error": str(e)}
+
     def save_game_session(self, score_data: Dict) -> Dict:
         """
         Save a complete game session with all data

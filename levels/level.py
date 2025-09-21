@@ -471,6 +471,24 @@ class Level:
             # Update arrow with both enemies and animated objects
             arrow.update(self.collision_sprite, self.enemies, self.animated_objects)
             
+            # Handle scoring for bow kills
+            if hasattr(arrow, 'kill_info') and arrow.kill_info:
+                kill_info = arrow.kill_info
+                if kill_info.get("killed_enemy"):
+                    # Award score for killing enemy with bow
+                    # Create a temporary object with rect attribute for camera
+                    temp_obj = type('obj', (object,), {'rect': pygame.Rect(kill_info["enemy_position"], (1, 1))})()
+                    enemy_screen_pos = self.camera.apply(temp_obj)
+                    points_earned = self.add_score(100, "kill", enemy_screen_pos)
+                    print(f"🏹 Bow kill! +{points_earned} points (Combo: {self.combo_count}x)")
+                elif kill_info.get("killed_animated_object"):
+                    # Award score for killing animated object with bow
+                    # Create a temporary object with rect attribute for camera
+                    temp_obj = type('obj', (object,), {'rect': pygame.Rect(kill_info["object_position"], (1, 1))})()
+                    obj_screen_pos = self.camera.apply(temp_obj)
+                    points_earned = self.add_score(150, "kill", obj_screen_pos)  # Higher score for animated objects
+                    print(f"🏹 Bow kill! +{points_earned} points (Combo: {self.combo_count}x)")
+            
             # Remove dead arrows
             if not arrow.alive():
                 self.player_arrows.remove(arrow)
@@ -930,6 +948,19 @@ class Level:
 
     def run(self, keys, collision_sprites):
         #run whole game(level)
+        
+        # Check for story progress updates from API
+        system_id = None
+        if self.api_client:
+            try:
+                system_id = self.api_client.get_system_id()
+            except Exception as e:
+                print(f"Warning: Could not get system_id: {e}")
+        
+        if self.story_progression.check_for_updates(self.api_client, system_id):
+            # Sync player inventory if hearts were updated
+            if hasattr(self, 'player') and self.player:
+                self.player.sync_inventory_from_story_progress()
         
         # API calls removed from mid-game - only happen at start and end
         

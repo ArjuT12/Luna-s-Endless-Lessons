@@ -41,6 +41,7 @@ class Arrow(pygame.sprite.Sprite):
         
         # Collision
         self.has_hit = False
+        self.kill_info = None  # Store kill information for scoring
         
         
     def update(self, collision_sprites, enemy_sprites, animated_objects=None):
@@ -69,9 +70,11 @@ class Arrow(pygame.sprite.Sprite):
             for enemy in enemy_sprites:
                 if hasattr(enemy, 'is_alive') and enemy.is_alive and self.rect.colliderect(enemy.rect):
                     # Deal damage to enemy
-                    enemy.take_damage(self.damage)
+                    enemy_died = enemy.take_damage(self.damage)
                     print(f"Arrow hit enemy for {self.damage} damage!")
                     self.has_hit = True
+                    # Store kill information for scoring
+                    self.kill_info = {"killed_enemy": enemy_died, "enemy_position": enemy.rect.center}
                     self.kill()
                     return
         
@@ -80,11 +83,14 @@ class Arrow(pygame.sprite.Sprite):
             for animated_obj in animated_objects:
                 if hasattr(animated_obj, 'is_alive') and animated_obj.is_alive and self.rect.colliderect(animated_obj.rect):
                     # Deal damage to animated object
-                    if animated_obj.take_damage(self.damage):
+                    obj_died = animated_obj.take_damage(self.damage)
+                    if obj_died:
                         print(f"Arrow killed animated object for {self.damage} damage!")
                     else:
                         print(f"Arrow hit animated object for {self.damage} damage! Health: {animated_obj.health}/{animated_obj.max_health}")
                     self.has_hit = True
+                    # Store kill information for scoring
+                    self.kill_info = {"killed_animated_object": obj_died, "object_position": animated_obj.rect.center}
                     self.kill()
                     return
         
