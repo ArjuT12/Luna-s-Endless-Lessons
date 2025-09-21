@@ -175,9 +175,6 @@ class Player(pygame.sprite.Sprite):
 
         # Only allow movement, direction changes, and jumping if not attacking, not in inventory navigation mode, and not in dialogue
         if not self.attacking and not self.inventory.is_open and not dialogue_active:
-            # Debug: print when movement is enabled
-            if keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]:
-                print(f"Movement enabled. Inventory open: {self.inventory.is_open}")
             if keys[pygame.K_RIGHT]:
                 dx = 4
                 self.facing_right = True

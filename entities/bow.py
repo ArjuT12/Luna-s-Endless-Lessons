@@ -20,7 +20,7 @@ class Bow(pygame.sprite.Sprite):
         
         # Bow properties
         self.shoot_cooldown = 0
-        self.shoot_delay = 30  # Faster than gun, slower than sword
+        self.shoot_delay = 10  # Much faster bow shooting
         self.arrows = pygame.sprite.Group()
         self.story_progression = story_progression
     
@@ -46,8 +46,6 @@ class Bow(pygame.sprite.Sprite):
     
     def shoot_arrow(self, player_rect, player_facing_right):
         """Create and shoot an arrow"""
-        print(f"🏹 BOW SHOOT: cooldown={self.shoot_cooldown}, player_rect={player_rect}, facing_right={player_facing_right}")
-        
         if self.shoot_cooldown <= 0:
             
             # Calculate arrow spawn position (slightly away from player to avoid collision)
@@ -62,23 +60,16 @@ class Bow(pygame.sprite.Sprite):
             damage_multiplier = 1.0
             if self.story_progression:
                 damage_multiplier = self.story_progression.get_bow_damage_multiplier()
-
-            print(f"🏹 BOW SHOOTING arrow at ({arrow_x}, {arrow_y}) direction {direction}, damage_multiplier={damage_multiplier}")
-            print(f"🏹 Player rect: {player_rect}")
             
             # Create arrow with damage multiplier
             arrow = Arrow(arrow_x, arrow_y, direction, damage_multiplier=damage_multiplier)
             if arrow:
                 self.arrows.add(arrow)
                 self.shoot_cooldown = self.shoot_delay
-                print(f"🏹 Arrow added to group, total arrows: {len(self.arrows)}")
-                print(f"🏹 Arrow group contents: {list(self.arrows)}")
                 return arrow
             else:
-                print(f"🏹 FAILED TO CREATE ARROW!")
                 return None
         else:
-            print(f"🏹 BOW ON COOLDOWN: {self.shoot_cooldown}")
             return None
     
     def is_attacking(self):
@@ -93,7 +84,7 @@ class Bow(pygame.sprite.Sprite):
             self.shoot_cooldown -= 1
         
         if player_attacking and self.shoot_cooldown <= 0:
-            self.index += 0.3  # Faster animation than gun
+            self.index += 1.0  # Much faster bow animation
             if self.index >= len(self.current_frames):
                 self.attacking = False
                 self.index = 0

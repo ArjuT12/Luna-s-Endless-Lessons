@@ -14,7 +14,7 @@ class StoryProgression:
             "inventory": []
         }
         self.last_check_time = 0
-        self.check_interval = 5.0  # Check every 5 seconds
+        self.check_interval = 30  # Check every 5 seconds
         self.load_progress()
     
     def load_progress(self):
@@ -65,6 +65,12 @@ class StoryProgression:
     def can_use_bow(self):
         """Check if player can use bow"""
         return self.progress["bow_unlocked"]
+    
+    def get_bow_damage_multiplier(self):
+        """Calculate bow damage multiplier based on deaths"""
+        deaths = self.progress.get("deaths", 0)
+        multiplier = 1.0 + (deaths // 5) * 0.1
+        return max(1.0, multiplier)
     
     def get_story_dialogue(self, story_part):
         """Get dialogue for specific story part"""
