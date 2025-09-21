@@ -16,13 +16,10 @@ from api_client import get_api_client, APIError
 class Level:
     def __init__(self):
         
-        #Level setup
         self.display_surface = pygame.display.get_surface()
         
-        # Story progression system
         self.story_progression = StoryProgression()
         
-        # API integration
         self.api_client = get_api_client()
         self.api_connected = False
         self.score_saved = False
@@ -30,22 +27,19 @@ class Level:
         self.game_data_initialized = False
         self.player_progress = None
         
-        # Currency system
         self.currency_earned = 0
         self.currency_rule = None
 
-        #sprite Group 
         self.visible_sprite = pygame.sprite.Group()
         self.active_sprite = pygame.sprite.Group()
         self.collision_sprite = pygame.sprite.Group()
-        self.enemy_sprite = pygame.sprite.Group()  # Group for enemy tiles
-        self.enemies = pygame.sprite.Group()  # Group for actual enemy sprites
-        self.enemy_projectiles = pygame.sprite.Group()  # Group for enemy projectiles
-        self.hearts = pygame.sprite.Group()  # Group for heart objects
-        self.player_arrows = pygame.sprite.Group()  # Group for player arrows
-        self.animated_objects = pygame.sprite.Group()  # Group for animated objects
+        self.enemy_sprite = pygame.sprite.Group()
+        self.enemies = pygame.sprite.Group()
+        self.enemy_projectiles = pygame.sprite.Group()
+        self.hearts = pygame.sprite.Group()
+        self.player_arrows = pygame.sprite.Group()
+        self.animated_objects = pygame.sprite.Group()
         
-        # Game stats
         self.enemies_hit = 0
         self.game_over = False
         self.game_won = False

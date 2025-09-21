@@ -10,12 +10,11 @@ class StoryProgression:
             "bow_unlocked": False,
             "current_story_part": 0,
             "has_seen_intro": False,
-            "inventory": []  # Store inventory items
+            "inventory": []
         }
         self.load_progress()
     
     def load_progress(self):
-        """Load story progression from file"""
         if os.path.exists(self.save_file):
             try:
                 with open(self.save_file, 'r') as f:
@@ -33,7 +32,6 @@ class StoryProgression:
                 }
     
     def save_progress(self):
-        """Save story progression to file"""
         try:
             with open(self.save_file, 'w') as f:
                 json.dump(self.progress, f, indent=2)
@@ -42,17 +40,14 @@ class StoryProgression:
             print(f"Error saving story progress: {e}")
     
     def player_died(self):
-        """Called when player dies - updates progression"""
         self.progress["deaths"] += 1
         print(f"Player died! Total deaths: {self.progress['deaths']}")
         
-        # Unlock hearts after first death
         if self.progress["deaths"] == 1 and not self.progress["hearts_unlocked"]:
             self.progress["hearts_unlocked"] = True
             self.progress["current_story_part"] = 1
             print("Hearts unlocked!")
         
-        # Unlock bow after second death
         elif self.progress["deaths"] == 2 and not self.progress["bow_unlocked"]:
             self.progress["bow_unlocked"] = True
             self.progress["current_story_part"] = 2

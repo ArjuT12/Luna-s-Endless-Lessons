@@ -8,33 +8,28 @@ from typing import Dict, Optional
 
 class GameSettings:
     def __init__(self):
-        # Use a hidden location for settings file
         self.settings_file = self._get_hidden_settings_path()
         self.settings_data = self.load_settings()
     
     def _get_hidden_settings_path(self) -> str:
         """Get a hidden path for the settings file"""
         if getattr(sys, 'frozen', False):
-            # Running as compiled EXE - use cross-platform approach
             home = os.path.expanduser("~")
             hidden_dir = os.path.join(home, '.luna_game')
             os.makedirs(hidden_dir, exist_ok=True)
             return os.path.join(hidden_dir, 'settings.dat')
         else:
-            # Running as Python script (development)
             return "game_settings.json"
     
     def generate_system_id(self) -> str:
         """Generate a unique system ID based on system information and timestamp"""
         import time
-        # Get system information (simplified for cross-platform compatibility)
         system_info = {
             'machine': platform.machine(),
             'node': platform.node(),
             'timestamp': str(int(time.time()))
         }
         
-        # Create a hash from system information including timestamp
         system_string = f"{system_info['machine']}-{system_info['node']}-{system_info['timestamp']}"
         system_id = hashlib.md5(system_string.encode()).hexdigest()[:16]
         
@@ -46,12 +41,10 @@ class GameSettings:
             try:
                 with open(self.settings_file, 'r') as f:
                     if getattr(sys, 'frozen', False):
-                        # Running as EXE - deobfuscate data
                         obfuscated_data = f.read()
                         json_str = self._deobfuscate_data(obfuscated_data)
                         return json.loads(json_str)
                     else:
-                        # Running as Python script - normal JSON
                         return json.load(f)
             except (json.JSONDecodeError, IOError, UnicodeDecodeError):
                 print("Error loading settings file, creating new one...")
@@ -85,14 +78,12 @@ class GameSettings:
         
         try:
             if getattr(sys, 'frozen', False):
-                # Running as EXE - obfuscate data
                 json_str = json.dumps(settings_data, separators=(',', ':'))
                 obfuscated = self._obfuscate_data(json_str)
                 
                 with open(self.settings_file, 'w') as f:
                     f.write(obfuscated)
             else:
-                # Running as Python script - normal JSON
                 with open(self.settings_file, 'w') as f:
                     json.dump(settings_data, f, indent=2)
         except IOError as e:

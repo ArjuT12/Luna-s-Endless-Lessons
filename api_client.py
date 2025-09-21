@@ -1,46 +1,30 @@
-"""
-API Client for Luna's Endless Lesson Backend Integration
-Handles all communication with the backend API for player data and score management
-"""
-
 import requests
 import json
 import logging
 from typing import Dict, Optional, List, Any
 from settings import GameSettings
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class LunaAPIClient:
     def __init__(self, base_url: str = "https://luna-s-endless-lessons.onrender.com"):
-        """
-        Initialize the API client for Render server
-        
-        Args:
-            base_url: Base URL of the backend API
-        """
         self.base_url = base_url.rstrip('/')
         self.session = requests.Session()
         
-        # Optimize for Render server (always running)
         self.session.headers.update({
             'Content-Type': 'application/json',
             'User-Agent': 'LunaGame/1.0',
             'Accept': 'application/json'
         })
         
-        # Set reasonable timeouts for Render server
-        self.session.timeout = 10  # 10 second timeout for Render
+        self.session.timeout = 10
         
-        # Game settings for system_id
         self.game_settings = GameSettings()
         
-        # Cache for player data to avoid repeated API calls
         self._player_data_cache = None
         self._cache_timestamp = 0
-        self._cache_duration = 300  # 5 minutes
+        self._cache_duration = 300
         
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Dict:
         """

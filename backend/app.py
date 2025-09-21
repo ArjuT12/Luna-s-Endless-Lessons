@@ -9,21 +9,17 @@ from flask_pymongo import PyMongo
 from dotenv import load_dotenv
 from bson import ObjectId
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def update_story_progress(system_id, hearts_purchased):
-    """Update story_progress.json when hearts are purchased"""
     try:
         story_progress_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'story_progress.json')
         
-        # Read current story progress
         if os.path.exists(story_progress_path):
             with open(story_progress_path, 'r') as f:
                 story_data = json.load(f)
         else:
-            # Create default story progress if file doesn't exist
             story_data = {
                 "deaths": 0,
                 "hearts_unlocked": True,
@@ -33,21 +29,17 @@ def update_story_progress(system_id, hearts_purchased):
                 "inventory": []
             }
         
-        # Update inventory with purchased hearts
         inventory = story_data.get("inventory", [])
         heart_item = None
         
-        # Find existing heart item in inventory
         for item in inventory:
             if item.get("type") == "heart":
                 heart_item = item
                 break
         
         if heart_item:
-            # Update existing heart quantity
             heart_item["quantity"] = heart_item.get("quantity", 0) + hearts_purchased
         else:
-            # Add new heart item to inventory
             inventory.append({
                 "type": "heart",
                 "quantity": hearts_purchased

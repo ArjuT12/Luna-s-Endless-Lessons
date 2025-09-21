@@ -8,12 +8,11 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, waypoints=None):
         super().__init__()
         
-        # Basic enemy properties
         self.size = 32
         self.image = pygame.Surface((self.size, self.size))
         self.rect = self.image.get_rect()
         self.rect.centerx = x
-        self.rect.bottom = y  # Position enemy at ground level using bottom
+        self.rect.bottom = y
         
         # Health system
         self.max_health = 1

@@ -4,20 +4,12 @@ from entities.inventory import Inventory
 from story_progression import StoryProgression
 from config import *
 
-# player.py
-
-
-# player.py
-
-
 class Player(pygame.sprite.Sprite):
     def __init__(self, story_progression=None):
         super().__init__()
         
-        # Story progression system
         self.story_progression = story_progression or StoryProgression()
 
-        # Load and scale sprite sheets (unchanged from previous)
         walk_sheet = pygame.image.load("Soldier-Walk.png").convert_alpha()
         attack1_sheet = pygame.image.load("Soldier-Attack01.png").convert_alpha()
         attack2_sheet = pygame.image.load("Soldier-Attack03.png").convert_alpha()
@@ -67,10 +59,9 @@ class Player(pygame.sprite.Sprite):
 
         self.index = 0
         self.image = self.walk_frames_right[0]
-        self.rect = self.image.get_rect()  # Don't set position here, let level setup handle it
+        self.rect = self.image.get_rect()
         
-        # Create a smaller collision box for more precise collision detection
-        self.collision_rect = pygame.Rect(0, 0, 24, self.rect.height)  # 24px wide collision box
+        self.collision_rect = pygame.Rect(0, 0, 24, self.rect.height)
 
         self.vel_y = 0
         self.on_ground = True
@@ -80,38 +71,32 @@ class Player(pygame.sprite.Sprite):
         self.attack_index = 0
         self.weapon_switched = False
         
-        # Weapon system - start with only sword, unlock bow through story progression
-        self.current_weapon = 'sword'  # 'sword', 'bow'
+        self.current_weapon = 'sword'
         self.weapon_switch_cooldown = 0
         self.can_use_bow = self.story_progression.can_use_bow()
         
-        # Ensure player starts with sword if bow is not unlocked
         if not self.can_use_bow:
             self.current_weapon = 'sword'
         
-        # Health system
         self.max_health = 100
         self.health = self.max_health
         self.is_alive = True
         self.invulnerable = False
         self.invulnerability_timer = 0
         
-        # Inventory system - start empty, unlock hearts through story progression
         self.inventory = Inventory()
         self.inventory_toggle_cooldown = 0
         self.heart_use_cooldown = 0
         
         self.can_use_hearts = self.story_progression.can_use_hearts()
         
-        # Load saved inventory if hearts are unlocked
         if self.can_use_hearts:
             saved_inventory = self.story_progression.load_inventory()
             self.inventory.items = saved_inventory.copy()
             print(f"Loaded inventory: {saved_inventory}")
             
-            # Add initial hearts only if inventory is empty (first time unlocking)
             if len(self.inventory.items) == 0:
-                self.inventory.add_item('heart', 3)  # Start with 3 hearts
+                self.inventory.add_item('heart', 3)
 
     def check_collision(self, dx, dy, collision_sprites):
         """Advanced collision detection that handles edge cases and platform tiles"""
