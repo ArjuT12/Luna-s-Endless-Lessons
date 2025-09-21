@@ -296,12 +296,15 @@ class StartScreen:
                         self.game_name_input.strip()
                     )
                     
-                    # Sync to database
+                    # Sync to database (same sync as game start)
                     try:
-                        self.api_client.create_or_update_player()
-                        print("✅ Player data synced to database successfully")
+                        sync_result = self.api_client.auto_sync_player_data()
+                        if sync_result["success"]:
+                            print(f" {sync_result['message']}")
+                        else:
+                            print(f"❌ {sync_result['message']}: {sync_result.get('error', 'Unknown error')}")
                     except Exception as e:
-                        print(f"❌ Failed to sync player data to database: {e}")
+                        print(f" Failed to sync player data to database: {e}")
                         # Continue anyway - local data is saved
                     
                     return "setup_complete"
@@ -404,10 +407,13 @@ class StartScreen:
                                     self.game_name_input.strip()
                                 )
                                 
-                                # Sync to database
+                                # Sync to database (same sync as game start)
                                 try:
-                                    self.api_client.create_or_update_player()
-                                    print("✅ Player data synced to database successfully")
+                                    sync_result = self.api_client.auto_sync_player_data()
+                                    if sync_result["success"]:
+                                        print(f"✅ {sync_result['message']}")
+                                    else:
+                                        print(f"❌ {sync_result['message']}: {sync_result.get('error', 'Unknown error')}")
                                 except Exception as e:
                                     print(f"❌ Failed to sync player data to database: {e}")
                                     # Continue anyway - local data is saved
