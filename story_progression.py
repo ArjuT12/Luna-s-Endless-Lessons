@@ -63,10 +63,18 @@ class StoryProgression:
         """Check if player can use bow"""
         return self.progress["bow_unlocked"]
     
+    def get_bow_damage_multiplier(self):
+        """Calculate bow damage multiplier based on deaths"""
+        deaths = self.progress.get("deaths", 0)
+        # Base multiplier starts at 1.0, increases by 0.1 for every 5 deaths
+        # This means: 0-4 deaths = 1.0x, 5-9 deaths = 1.1x, 10-14 deaths = 1.2x, etc.
+        multiplier = 1.0 + (deaths // 5) * 0.1
+        return max(1.0, multiplier)  # Ensure minimum 1.0x multiplier
+    
     def get_story_dialogue(self, story_part):
         """Get dialogue for specific story part"""
-        # Skip dialogue after 4 deaths
-        if self.progress["deaths"] >= 4:
+        # Skip dialogue after 2 deaths
+        if self.progress["deaths"] >= 2:
             return []
             
         dialogues = {

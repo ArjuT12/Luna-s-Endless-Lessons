@@ -182,7 +182,7 @@ class Level:
         
         # Create bow weapon using attack2_sheet (bow and arrow sprites)
         bow_frames = self.player.attack2_frames_right  # Use attack2_sheet for bow
-        self.bow = Bow(bow_frames, 0, 0)  # Create bow instance
+        self.bow = Bow(bow_frames, 0, 0, self.story_progression)  # Create bow instance with story progression
         
         # Create enemies
         self.create_enemies()

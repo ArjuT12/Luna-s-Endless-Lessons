@@ -5,7 +5,7 @@ from .arrow import Arrow
 class Bow(pygame.sprite.Sprite):
     """Bow weapon class for ranged attacks"""
     
-    def __init__(self, frames, x_bow_offset, y_bow_offset):
+    def __init__(self, frames, x_bow_offset, y_bow_offset, story_progression=None):
         super().__init__()
         self.frames_right = frames if frames else self.create_default_frames()
         self.frames_left = [pygame.transform.flip(f, True, False) for f in self.frames_right]
@@ -22,6 +22,7 @@ class Bow(pygame.sprite.Sprite):
         self.shoot_cooldown = 0
         self.shoot_delay = 30  # Faster than gun, slower than sword
         self.arrows = pygame.sprite.Group()
+        self.story_progression = story_progression
     
     def create_default_frames(self):
         """Create default bow frames when no sprites are provided"""
@@ -57,11 +58,16 @@ class Bow(pygame.sprite.Sprite):
             base_y = player_rect.centery + 50  # Start from player center, slightly higher
             arrow_y = base_y   # You can adjust this value as needed
 
-            print(f"🏹 BOW SHOOTING arrow at ({arrow_x}, {arrow_y}) direction {direction}")
+            # Get damage multiplier from story progression
+            damage_multiplier = 1.0
+            if self.story_progression:
+                damage_multiplier = self.story_progression.get_bow_damage_multiplier()
+
+            print(f"🏹 BOW SHOOTING arrow at ({arrow_x}, {arrow_y}) direction {direction}, damage_multiplier={damage_multiplier}")
             print(f"🏹 Player rect: {player_rect}")
             
-            # Create arrow
-            arrow = Arrow(arrow_x, arrow_y, direction)
+            # Create arrow with damage multiplier
+            arrow = Arrow(arrow_x, arrow_y, direction, damage_multiplier=damage_multiplier)
             if arrow:
                 self.arrows.add(arrow)
                 self.shoot_cooldown = self.shoot_delay

@@ -5,11 +5,12 @@ from config import *
 class Arrow(pygame.sprite.Sprite):
     """Arrow projectile class for bow weapon"""
     
-    def __init__(self, x, y, direction, speed=12):
+    def __init__(self, x, y, direction, speed=12, damage_multiplier=1.0):
         super().__init__()
         
         # Arrow properties
-        self.damage = 25  # Higher damage than sword
+        base_damage = 25  # Higher damage than sword
+        self.damage = int(base_damage * damage_multiplier)  # Apply multiplier
         self.speed = speed
         self.direction = direction  # 1 for right, -1 for left
         
