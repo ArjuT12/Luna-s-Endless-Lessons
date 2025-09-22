@@ -338,7 +338,7 @@ class Level:
         # Draw transition text
         font = pygame.font.Font(None, 48)
         if self.current_map == "nighttime":
-            text = font.render("Night Falls...", True, (255, 255, 255))
+            text = font.render("NightMode", True, (255, 255, 255))
         else:
             text = font.render("Entering Forest...", True, (255, 255, 255))
         

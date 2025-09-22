@@ -19,6 +19,9 @@ def create_background_for_map(map_name):
     """Create appropriate background for the given map"""
     if map_name == "forest2":
         return LayeredBackground(background_folder="Futuristic City Parallax")
+    elif map_name == "nighttime":
+        # Use a dark background for nighttime
+        return LayeredBackground(simple_background=True, background_color=(20, 20, 40))  # Dark blue-purple night sky
     else:
         return LayeredBackground()
 
