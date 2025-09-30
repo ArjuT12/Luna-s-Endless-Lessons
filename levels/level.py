@@ -471,6 +471,27 @@ class Level:
             # Update arrow with both enemies and animated objects
             arrow.update(self.collision_sprite, self.enemies, self.animated_objects)
             
+            # Process kill information for scoring
+            if hasattr(arrow, 'kill_info') and arrow.kill_info:
+                kill_info = arrow.kill_info
+                
+                # Award points for enemy kills
+                if kill_info.get("killed_enemy"):
+                    self.enemies_hit += 1
+                    enemy_screen_pos = self.camera.apply_pos(kill_info["enemy_position"])
+                    points_earned = self.add_score(100, "kill", enemy_screen_pos)
+                    print(f"🎯 Arrow killed enemy! +{points_earned} points (Combo: {self.combo_count}x)")
+                
+                # Award points for animated object kills
+                elif kill_info.get("killed_animated_object"):
+                    self.enemies_hit += 1
+                    obj_screen_pos = self.camera.apply_pos(kill_info["object_position"])
+                    points_earned = self.add_score(150, "kill", obj_screen_pos)  # Higher score for animated objects
+                    print(f"🎯 Arrow killed animated object! +{points_earned} points (Combo: {self.combo_count}x)")
+                
+                # Clear kill info to prevent duplicate scoring
+                arrow.kill_info = None
+            
             # Remove dead arrows
             if not arrow.alive():
                 self.player_arrows.remove(arrow)
